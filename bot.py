@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta
 
 from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
+    Update, InlineKeyboardButton, InlineKeyboardMarkup
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
@@ -15,7 +15,7 @@ ADMIN_ID = 7848870377
 CHANNEL_ID = -1002669687216
 DATA_FILE = "data.json"
 
-PUBLISH, SELECT_TEMPLATE, CONFIRM = range(3)
+PUBLISH, SELECT_TEMPLATE, PREVIEW = range(3)
 
 # ---------------- 数据读取保存 ---------------- #
 
@@ -83,7 +83,7 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- 用户发布流程 ---------------- #
 
-user_content = {}
+user_cache = {}
 
 async def publish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -98,38 +98,75 @@ async def publish(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def receive_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user_content[user_id] = update.message
-    buttons = [[InlineKeyboardButton(t, callback_data=t)] for t in data["templates"]]
+    user_cache[user_id] = {"message": update.message}
+    buttons = [[InlineKeyboardButton(t, callback_data=f"template|{t}")] for t in data["templates"]]
     await update.message.reply_text("请选择一个分类按钮：", reply_markup=InlineKeyboardMarkup(buttons))
     return SELECT_TEMPLATE
 
 async def choose_template(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    template = query.data
     user_id = query.from_user.id
-    content = user_content.get(user_id)
+    template = query.data.split("|")[1]
+    cache = user_cache.get(user_id)
+    if not cache:
+        await query.message.reply_text("内容已过期，请重新发布。")
+        return ConversationHandler.END
+    cache["template"] = template
 
-    caption = content.caption or content.text or ""
+    # 准备预览内容
+    msg = cache["message"]
+    caption = msg.caption or msg.text or ""
+    preview_text = f"{template}\n\n{caption}"
+    preview_buttons = [
+        [InlineKeyboardButton("✅确认发布", callback_data="confirm")],
+        [InlineKeyboardButton("❌取消发布", callback_data="cancel")]
+    ]
+
+    # 发送预览
+    if msg.photo:
+        file_id = msg.photo[-1].file_id
+        await context.bot.send_photo(chat_id=user_id, photo=file_id, caption=preview_text,
+                                     reply_markup=InlineKeyboardMarkup(preview_buttons))
+    elif msg.video:
+        file_id = msg.video.file_id
+        await context.bot.send_video(chat_id=user_id, video=file_id, caption=preview_text,
+                                     reply_markup=InlineKeyboardMarkup(preview_buttons))
+    else:
+        await context.bot.send_message(chat_id=user_id, text=preview_text,
+                                       reply_markup=InlineKeyboardMarkup(preview_buttons))
+
+    return PREVIEW
+
+async def preview_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    await query.answer()
+    if query.data == "cancel":
+        user_cache.pop(user_id, None)
+        await query.message.reply_text("❌ 已取消发布。")
+        return ConversationHandler.END
+
+    cache = user_cache.get(user_id)
+    if not cache:
+        await query.message.reply_text("发布数据已失效，请重新发布。")
+        return ConversationHandler.END
+
+    msg = cache["message"]
+    template = cache["template"]
+    caption = msg.caption or msg.text or ""
     final_text = f"{template}\n\n{caption}"
 
-    if content.photo:
-        file_id = content.photo[-1].file_id
-        await context.bot.send_photo(
-            chat_id=CHANNEL_ID,
-            photo=file_id,
-            caption=final_text
-        )
-    elif content.video:
-        file_id = content.video.file_id
-        await context.bot.send_video(
-            chat_id=CHANNEL_ID,
-            video=file_id,
-            caption=final_text
-        )
+    if msg.photo:
+        file_id = msg.photo[-1].file_id
+        await context.bot.send_photo(chat_id=CHANNEL_ID, photo=file_id, caption=final_text)
+    elif msg.video:
+        file_id = msg.video.file_id
+        await context.bot.send_video(chat_id=CHANNEL_ID, video=file_id, caption=final_text)
     else:
         await context.bot.send_message(chat_id=CHANNEL_ID, text=final_text)
 
+    user_cache.pop(user_id, None)
     await query.message.reply_text("✅ 已发布到频道！")
     return ConversationHandler.END
 
@@ -141,7 +178,8 @@ conv_handler = ConversationHandler(
     entry_points=[CommandHandler("publish", publish)],
     states={
         PUBLISH: [MessageHandler(filters.TEXT | filters.PHOTO | filters.VIDEO, receive_content)],
-        SELECT_TEMPLATE: [CallbackQueryHandler(choose_template)],
+        SELECT_TEMPLATE: [CallbackQueryHandler(choose_template, pattern=r"^template\|")],
+        PREVIEW: [CallbackQueryHandler(preview_decision, pattern="^(confirm|cancel)$")],
     },
     fallbacks=[],
 )
@@ -151,3 +189,5 @@ application.add_handler(CommandHandler("settemplate", settemplate))
 application.add_handler(CommandHandler("addvip", addvip))
 application.add_handler(CommandHandler("ban", ban))
 application.add_handler(conv_handler)
+
+# 如果你用 Webhook 方式，还需设置 app.run() 的 webhook 启动逻辑
