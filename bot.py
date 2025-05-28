@@ -1,171 +1,153 @@
+import json
+import os
+from datetime import datetime, timedelta
+
 from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    InputMediaPhoto, InputMediaVideo
+    Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    CallbackContext, CallbackQueryHandler, ConversationHandler
+    CallbackQueryHandler, ContextTypes, ConversationHandler
 )
-import os
-from utils import *
-from datetime import datetime
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7098191858:AAEOL8NazzqpCh9iJjv-YpkTUFukfEbdFyg")
-CHANNEL_ID = -1002669687216
+TOKEN = "7098191858:AAEOL8NazzqpCh9iJjv-YpkTUFukfEbdFyg"
 ADMIN_ID = 7848870377
+CHANNEL_ID = -1002669687216
+DATA_FILE = "data.json"
 
-application = Application.builder().token(BOT_TOKEN).build()
+PUBLISH, SELECT_TEMPLATE, CONFIRM = range(3)
 
-STEP_MEDIA, STEP_SELECT, STEP_REMARK = range(3)
-user_state = {}
+# ---------------- 数据读取保存 ---------------- #
 
-async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("欢迎使用频道发布机器人，请使用 /publish 开始发布。")
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "w") as f:
+            json.dump({"whitelist": {}, "banned": [], "templates": []}, f)
+    with open(DATA_FILE, "r") as f:
+        return json.load(f)
 
-async def publish(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if not is_vip(user_id):
-        await update.message.reply_text("您不是会员或已过期，无法发布。")
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+data = load_data()
+
+def is_vip(user_id):
+    entry = data["whitelist"].get(str(user_id))
+    if entry:
+        expiry = datetime.strptime(entry, "%Y-%m-%d %H:%M:%S")
+        return datetime.now() < expiry
+    return False
+
+# ---------------- 管理员命令 ---------------- #
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("欢迎使用发布机器人，发送 /publish 开始发布。")
+
+async def settemplate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    text = update.message.text.replace("/settemplate", "").strip()
+    if not text:
+        await update.message.reply_text("格式：/settemplate 按钮1|按钮2|按钮3")
+        return
+    buttons = text.split("|")
+    data["templates"] = buttons
+    save_data(data)
+    await update.message.reply_text("发布按钮模板已更新：\n" + "\n".join(buttons))
+
+async def addvip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    args = context.args
+    if len(args) != 2:
+        await update.message.reply_text("格式：/addvip 用户ID 天数")
+        return
+    user_id = args[0]
+    days = int(args[1])
+    expire_time = datetime.now() + timedelta(days=days)
+    data["whitelist"][str(user_id)] = expire_time.strftime("%Y-%m-%d %H:%M:%S")
+    save_data(data)
+    await update.message.reply_text(f"已添加 {user_id} 为 VIP，时效 {days} 天。")
+
+async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("格式：/ban 用户ID")
+        return
+    user_id = int(context.args[0])
+    data["banned"].append(user_id)
+    save_data(data)
+    await update.message.reply_text(f"用户 {user_id} 已封禁。")
+
+# ---------------- 用户发布流程 ---------------- #
+
+user_content = {}
+
+async def publish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id in data["banned"]:
+        await update.message.reply_text("你已被封禁，无法发布。")
         return ConversationHandler.END
-    user_state[user_id] = {
-        "media": [],
-        "data": {}
-    }
-    await update.message.reply_text("请发送图片或视频（可多张），发送完后输入任意文字继续。")
-    return STEP_MEDIA
-
-async def collect_media(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if "media" not in user_state.get(user_id, {}):
-        return STEP_MEDIA
-    media = update.message.photo or ([update.message.video] if update.message.video else [])
-    if media:
-        file_id = media[-1].file_id
-        kind = "photo" if update.message.photo else "video"
-        user_state[user_id]["media"].append((kind, file_id))
-    return STEP_MEDIA
-
-async def proceed_options(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    data = load_data()
-    options = data.get("options", {})
-    if not options:
-        await update.message.reply_text("发布选项未设置，请联系管理员。")
+    if not is_vip(user.id):
+        await update.message.reply_text("你不是会员，无法发布，请联系管理员。")
         return ConversationHandler.END
-    first_key = list(options.keys())[0]
-    return await send_option_buttons(update, context, first_key)
+    await update.message.reply_text("请发送你要发布的内容（支持文字、图片、视频）。")
+    return PUBLISH
 
-async def send_option_buttons(update, context, current_key):
+async def receive_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    data = load_data()
-    options = data["options"]
-    if current_key not in options:
-        await update.message.reply_text("无效选项。")
-        return ConversationHandler.END
-    buttons = [
-        [InlineKeyboardButton(text=val, callback_data=f"{current_key}:{val}")]
-        for val in options[current_key]
-    ]
-    await update.message.reply_text(f"请选择 {current_key}：", reply_markup=InlineKeyboardMarkup(buttons))
-    return STEP_SELECT
+    user_content[user_id] = update.message
+    buttons = [[InlineKeyboardButton(t, callback_data=t)] for t in data["templates"]]
+    await update.message.reply_text("请选择一个分类按钮：", reply_markup=InlineKeyboardMarkup(buttons))
+    return SELECT_TEMPLATE
 
-async def button_handler(update: Update, context: CallbackContext):
+async def choose_template(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    template = query.data
     user_id = query.from_user.id
-    key, value = query.data.split(":")
-    user_state[user_id]["data"][key] = value
-    data = load_data()
-    options = data["options"]
-    keys = list(options.keys())
-    current_index = keys.index(key)
-    if current_index + 1 < len(keys):
-        next_key = keys[current_index + 1]
-        return await send_option_buttons(query, context, next_key)
-    else:
-        await query.message.reply_text("请输入备注：")
-        return STEP_REMARK
+    content = user_content.get(user_id)
 
-async def final_remark(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    username = update.effective_user.username or "匿名"
-    remark = update.message.text.strip()
-    user_state[user_id]["data"]["备注"] = remark
-    text = render_template(user_state[user_id]["data"], username)
-    media = user_state[user_id]["media"]
-    if len(media) == 1:
-        kind, file_id = media[0]
-        if kind == "photo":
-            await context.bot.send_photo(CHANNEL_ID, file_id, caption=text)
-        else:
-            await context.bot.send_video(CHANNEL_ID, file_id, caption=text)
-    elif media:
-        group = []
-        for idx, (kind, file_id) in enumerate(media):
-            if kind == "photo":
-                group.append(InputMediaPhoto(media=file_id, caption=text if idx == 0 else None))
-            else:
-                group.append(InputMediaVideo(media=file_id, caption=text if idx == 0 else None))
-        await context.bot.send_media_group(CHANNEL_ID, media=group)
+    caption = content.caption or content.text or ""
+    final_text = f"{template}\n\n{caption}"
+
+    if content.photo:
+        file_id = content.photo[-1].file_id
+        await context.bot.send_photo(
+            chat_id=CHANNEL_ID,
+            photo=file_id,
+            caption=final_text
+        )
+    elif content.video:
+        file_id = content.video.file_id
+        await context.bot.send_video(
+            chat_id=CHANNEL_ID,
+            video=file_id,
+            caption=final_text
+        )
     else:
-        await context.bot.send_message(CHANNEL_ID, text=text)
-    await update.message.reply_text("发布成功！")
-    user_state.pop(user_id, None)
+        await context.bot.send_message(chat_id=CHANNEL_ID, text=final_text)
+
+    await query.message.reply_text("✅ 已发布到频道！")
     return ConversationHandler.END
 
-async def cancel(update: Update, context: CallbackContext):
-    user_state.pop(update.effective_user.id, None)
-    await update.message.reply_text("发布已取消。")
-    return ConversationHandler.END
+# ---------------- 主程序入口 ---------------- #
 
-async def admin_commands(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
-        return
-    cmd = update.message.text
-    args = cmd.split()
-    data = load_data()
-
-    if cmd.startswith("/addvip") and len(args) == 3:
-        add_vip(args[1], int(args[2]))
-        await update.message.reply_text("已添加会员")
-    elif cmd.startswith("/delvip") and len(args) == 2:
-        del_vip(args[1])
-        await update.message.reply_text("已删除会员")
-    elif cmd.startswith("/setoptions") and len(args) >= 2:
-        option_string = " ".join(args[1:])
-        try:
-            parts = option_string.split("|")
-            options = {}
-            for part in parts:
-                key, values = part.split(":")
-                options[key] = values.split(",")
-            data["options"] = options
-            save_data(data)
-            await update.message.reply_text("发布选项已更新")
-        except:
-            await update.message.reply_text("格式错误，请用 数量:1,5|价格:10元,50元")
-    elif cmd.startswith("/settemplate") and len(args) >= 2:
-        data["template"] = cmd.replace("/settemplate ", "", 1)
-        save_data(data)
-        await update.message.reply_text("模板已更新")
-
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("publish", publish))
-application.add_handler(CommandHandler("cancel", cancel))
-application.add_handler(CommandHandler("addvip", admin_commands))
-application.add_handler(CommandHandler("delvip", admin_commands))
-application.add_handler(CommandHandler("setoptions", admin_commands))
-application.add_handler(CommandHandler("settemplate", admin_commands))
+application = Application.builder().token(TOKEN).build()
 
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("publish", publish)],
     states={
-        STEP_MEDIA: [MessageHandler(filters.ALL & ~filters.COMMAND, collect_media),
-                     MessageHandler(filters.TEXT & ~filters.COMMAND, proceed_options)],
-        STEP_SELECT: [CallbackQueryHandler(button_handler)],
-        STEP_REMARK: [MessageHandler(filters.TEXT & ~filters.COMMAND, final_remark)]
+        PUBLISH: [MessageHandler(filters.TEXT | filters.PHOTO | filters.VIDEO, receive_content)],
+        SELECT_TEMPLATE: [CallbackQueryHandler(choose_template)],
     },
-    fallbacks=[CommandHandler("cancel", cancel)]
+    fallbacks=[],
 )
+
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("settemplate", settemplate))
+application.add_handler(CommandHandler("addvip", addvip))
+application.add_handler(CommandHandler("ban", ban))
 application.add_handler(conv_handler)
