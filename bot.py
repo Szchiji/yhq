@@ -8,20 +8,24 @@ from telegram.ext import (
     CallbackQueryHandler, ContextTypes,
 )
 
-# 配置日志
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+CHANNEL_ID = os.getenv("CHANNEL_ID")
+ADMIN_ID = os.getenv("ADMIN_ID")
+
+if not BOT_TOKEN or not CHANNEL_ID or not ADMIN_ID:
+    raise ValueError("请在环境变量中正确设置 BOT_TOKEN、CHANNEL_ID、ADMIN_ID")
+
+CHANNEL_ID = int(CHANNEL_ID)
+ADMIN_ID = int(ADMIN_ID)
 
 DATA_FILE = "data.json"
 user_states = {}
 
-# 初始化数据文件
 def load_data():
     if not os.path.exists(DATA_FILE):
         data = {
