@@ -18,7 +18,8 @@ WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
 DATA_FILE = 'data.json'
 
 app = Flask(__name__)
-bot = Bot(token=TOKEN)
+import os
+TOKEN = os.getenv("TOKEN")
 
 if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, 'w') as f:
