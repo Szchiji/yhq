@@ -1,171 +1,165 @@
 import json
 import os
 from flask import Flask, request
-from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, Filters, CallbackContext
-from telegram.ext import Dispatcher
+from telegram import Update, Bot
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+)
 
-# 配置常量
 TOKEN = '7098191858:AAEOL8NazzqpCh9iJjv-YpkTUFukfEbdFyg'
-ADMIN_ID = 7848870377
 CHANNEL_ID = -1002669687216
-DATA_FILE = 'data.json'
+ADMIN_ID = 7848870377
 WEBHOOK_URL = 'https://yhq.onrender.com'
 
-# 初始化 Flask 与 Telegram Bot
+DATA_FILE = 'data.json'
+
+# 初始化 Flask
 app = Flask(__name__)
 bot = Bot(token=TOKEN)
 
-# 初始化 Dispatcher（同步版本）
-dispatcher = Dispatcher(bot, update_queue=None, workers=0, use_context=True)
+# 加载/初始化数据文件
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, 'w') as f:
+        json.dump({"whitelist": [], "banned": [], "template": "默认模板"}, f)
 
-# 加载数据文件
 def load_data():
-    if not os.path.exists(DATA_FILE):
-        return {"whitelist": [], "banned": [], "templates": {"default": "数量：{count}\n价格：{price}\n限制：{limit}"}}
     with open(DATA_FILE, 'r') as f:
         return json.load(f)
 
 def save_data(data):
     with open(DATA_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+        json.dump(data, f)
 
-data = load_data()
+# Bot 应用（同步模式）
+application = Application.builder().token(TOKEN).build()
 
-# 命令：/start
-def start(update: Update, context: CallbackContext):
+# /start 指令：申请发布权限
+def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id in data['banned']:
-        return update.message.reply_text("你已被封禁，无法使用本服务。")
-    if user_id in data['whitelist']:
-        return update.message.reply_text("你已获得发布权限，可使用 /publish 发布内容。")
-    keyboard = [[InlineKeyboardButton("申请发布权限", callback_data=f"apply_{user_id}")]]
-    update.message.reply_text("欢迎使用发布机器人，点击下方按钮申请发布权限：", reply_markup=InlineKeyboardMarkup(keyboard))
+    bot.send_message(chat_id=ADMIN_ID, text=f'用户 {user_id} 请求发布权限。\n使用 /approve {user_id} 通过。')
+    update.message.reply_text('你的申请已提交，请等待管理员审核。')
 
-# 回调按钮处理（申请权限）
-def button_handler(update: Update, context: CallbackContext):
-    query = update.callback_query
-    query.answer()
-    data_parts = query.data.split("_")
-    if data_parts[0] == "apply":
-        user_id = int(data_parts[1])
-        bot.send_message(chat_id=ADMIN_ID, text=f"🔔 用户申请发布权限：{user_id}\n\n/approve {user_id} — 通过\n/ban {user_id} — 封禁")
-        query.edit_message_text("✅ 申请已提交，请等待管理员审核。")
-
-# 管理员命令：批准权限
-def approve(update: Update, context: CallbackContext):
+# 管理员批准用户
+def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
-    if len(context.args) != 1:
-        return update.message.reply_text("用法：/approve 用户ID")
-    user_id = int(context.args[0])
-    if user_id not in data['whitelist']:
-        data['whitelist'].append(user_id)
-        save_data(data)
-    bot.send_message(chat_id=user_id, text="🎉 你已获得发布权限，现在可以使用 /publish 命令发布内容！")
-    update.message.reply_text(f"✅ 已批准 {user_id} 的发布权限。")
+    try:
+        target_id = int(context.args[0])
+        data = load_data()
+        if target_id not in data['whitelist']:
+            data['whitelist'].append(target_id)
+            save_data(data)
+            bot.send_message(chat_id=target_id, text='你已获得发布权限，使用 /publish 发布内容。')
+            update.message.reply_text(f'{target_id} 已添加到白名单。')
+    except:
+        update.message.reply_text('用法：/approve 用户ID')
 
-# 管理员命令：封禁用户
-def ban(update: Update, context: CallbackContext):
+# 封禁用户
+def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
-    if len(context.args) != 1:
-        return update.message.reply_text("用法：/ban 用户ID")
-    user_id = int(context.args[0])
-    if user_id not in data['banned']:
-        data['banned'].append(user_id)
-    if user_id in data['whitelist']:
-        data['whitelist'].remove(user_id)
-    save_data(data)
-    bot.send_message(chat_id=user_id, text="🚫 你已被管理员封禁，无法继续使用此机器人。")
-    update.message.reply_text(f"🚫 已封禁用户 {user_id}")
+    try:
+        target_id = int(context.args[0])
+        data = load_data()
+        if target_id not in data['banned']:
+            data['banned'].append(target_id)
+            save_data(data)
+            update.message.reply_text(f'{target_id} 已封禁。')
+            bot.send_message(chat_id=target_id, text='你已被封禁，无法发布内容。')
+    except:
+        update.message.reply_text('用法：/ban 用户ID')
 
-# 用户命令：发布内容
-def publish(update: Update, context: CallbackContext):
+# 发布内容
+user_states = {}  # 缓存用户状态
+
+def publish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id in data['banned']:
-        return update.message.reply_text("你已被封禁，无法使用本服务。")
-    if user_id not in data['whitelist']:
-        return update.message.reply_text("你尚未获得发布权限，请先通过 /start 申请权限。")
-    context.user_data['state'] = 'await_media'
-    update.message.reply_text("请发送要发布的【图片或视频】。")
+    data = load_data()
+    if user_id in data.get("banned", []):
+        update.message.reply_text("你已被封禁。")
+        return
+    if user_id not in data.get("whitelist", []):
+        update.message.reply_text("你没有发布权限，请先使用 /start 申请。")
+        return
+    user_states[user_id] = {"step": 1}
+    update.message.reply_text("请发送你要发布的图片或视频")
 
-# 处理用户发来的图片或视频
-def media_handler(update: Update, context: CallbackContext):
+def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id not in data['whitelist']:
-        return
-    if context.user_data.get('state') != 'await_media':
-        return
-    context.user_data['media'] = update.message
-    context.user_data['state'] = 'await_details'
-    update.message.reply_text("请输入发布详情，格式如下：\n数量：xxx\n价格：xxx\n限制：xxx")
-
-# 处理详情文字
-def detail_handler(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if user_id not in data['whitelist']:
-        return
-    if context.user_data.get('state') != 'await_details':
-        return
-    detail = update.message.text
-    context.user_data['detail'] = detail
-    context.user_data['state'] = 'await_confirm'
-    keyboard = [
-        [InlineKeyboardButton("✅ 确认发布", callback_data="confirm_post")],
-        [InlineKeyboardButton("❌ 取消发布", callback_data="cancel_post")]
-    ]
-    update.message.reply_text("请确认以下内容将被发布：\n\n" + detail, reply_markup=InlineKeyboardMarkup(keyboard))
-
-# 回调按钮确认发布
-def confirm_button_handler(update: Update, context: CallbackContext):
-    query = update.callback_query
-    user_id = query.from_user.id
-    query.answer()
-
-    if query.data == "cancel_post":
-        context.user_data.clear()
-        query.edit_message_text("已取消发布。")
+    state = user_states.get(user_id)
+    if not state:
         return
 
-    if query.data == "confirm_post":
-        media_msg = context.user_data.get('media')
-        detail = context.user_data.get('detail', '')
-        if not media_msg:
-            query.edit_message_text("错误：未找到媒体内容。")
+    if state["step"] == 1:
+        if update.message.photo:
+            state["media"] = update.message.photo[-1].file_id
+            state["type"] = "photo"
+        elif update.message.video:
+            state["media"] = update.message.video.file_id
+            state["type"] = "video"
+        else:
+            update.message.reply_text("请发送图片或视频")
             return
-        if media_msg.photo:
-            file_id = media_msg.photo[-1].file_id
-            bot.send_photo(chat_id=CHANNEL_ID, photo=file_id, caption=detail)
-        elif media_msg.video:
-            file_id = media_msg.video.file_id
-            bot.send_video(chat_id=CHANNEL_ID, video=file_id, caption=detail)
-        query.edit_message_text("✅ 发布成功。")
-        context.user_data.clear()
+        state["step"] = 2
+        update.message.reply_text("请输入数量：")
+    elif state["step"] == 2:
+        state["amount"] = update.message.text
+        state["step"] = 3
+        update.message.reply_text("请输入价格：")
+    elif state["step"] == 3:
+        state["price"] = update.message.text
+        state["step"] = 4
+        update.message.reply_text("请输入限制类型（如：仅限女性）：")
+    elif state["step"] == 4:
+        state["limit"] = update.message.text
+        data = load_data()
+        tpl = data.get("template", "默认模板")
+        final_text = f"{tpl}\n数量：{state['amount']}\n价格：{state['price']}\n限制：{state['limit']}"
+        if state["type"] == "photo":
+            bot.send_photo(chat_id=CHANNEL_ID, photo=state["media"], caption=final_text)
+        else:
+            bot.send_video(chat_id=CHANNEL_ID, video=state["media"], caption=final_text)
+        update.message.reply_text("发布成功。")
+        user_states.pop(user_id)
 
-# 添加处理器到 dispatcher
-dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CommandHandler("publish", publish))
-dispatcher.add_handler(CommandHandler("approve", approve))
-dispatcher.add_handler(CommandHandler("ban", ban))
-dispatcher.add_handler(MessageHandler(Filters.photo | Filters.video, media_handler))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, detail_handler))
-dispatcher.add_handler(CallbackQueryHandler(button_handler, pattern="^apply_"))
-dispatcher.add_handler(CallbackQueryHandler(confirm_button_handler, pattern="^(confirm_post|cancel_post)$"))
+# 设置模板
+def set_template(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    tpl = update.message.text.replace("/settpl", "").strip()
+    if tpl:
+        data = load_data()
+        data["template"] = tpl
+        save_data(data)
+        update.message.reply_text("模板已更新。")
+    else:
+        update.message.reply_text("用法：/settpl 模板内容")
 
-# Webhook 接收处理
-@app.route(f"/{TOKEN}", methods=["POST"])
+# 添加指令处理器
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("approve", approve))
+application.add_handler(CommandHandler("ban", ban))
+application.add_handler(CommandHandler("publish", publish))
+application.add_handler(CommandHandler("settpl", set_template))
+application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.TEXT, handle_media))
+
+# Flask 路由
+@app.route(f"/", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
-    return 'ok'
+    application.update_queue.put_nowait(update)
+    return "ok"
 
-# 设置 webhook
-@app.route("/")
+# 设置 Webhook
+@app.route("/set_webhook", methods=["GET"])
 def set_webhook():
-    bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
-    return "Webhook 设置成功"
+    success = bot.set_webhook(f"{WEBHOOK_URL}")
+    return f"设置成功: {success}"
 
-# 启动 Flask 应用
+# 启动 Flask
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
