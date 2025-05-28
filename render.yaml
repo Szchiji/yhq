@@ -2,12 +2,8 @@ services:
   - type: web
     name: telegram-bot
     env: python
-    buildCommand: ""
-    startCommand: python bot.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: python webhook.py
     envVars:
       - key: BOT_TOKEN
         value: 7098191858:AAEOL8NazzqpCh9iJjv-YpkTUFukfEbdFyg
-      - key: CHANNEL_ID
-        value: -1002669687216
-      - key: ADMIN_ID
-        value: 7848870377
