@@ -72,8 +72,8 @@ def check_permission(user_id):
     except:
         return False
 
-# --- 命令处理函数 ---
 
+# --- 命令处理函数 ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if check_permission(user_id):
@@ -153,8 +153,8 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"已批准用户 {user_id} 发布权限，有效期30天。")
     try:
         await context.bot.send_message(user_id, "管理员已批准你发布权限，你可以发送 /publish 开始发布内容。")
-    except:
-        logger.warning(f"无法发送消息给用户 {user_id}")
+    except Exception as e:
+        logger.warning(f"无法发送消息给用户 {user_id}，原因：{e}")
 
 
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -172,8 +172,8 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"已拒绝用户 {user_id} 发布权限申请。")
     try:
         await context.bot.send_message(user_id, "管理员拒绝了你的发布权限申请。")
-    except:
-        logger.warning(f"无法发送消息给用户 {user_id}")
+    except Exception as e:
+        logger.warning(f"无法发送消息给用户 {user_id}，原因：{e}")
 
 
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -253,71 +253,90 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    msg = update.message
-    text = msg.text.strip()
-    state = user_states.get(user_id)
-
-    if not state:
-        return  # 非发布流程中的文本忽略
+    if user_id not in user_states:
+        return  # 非发布流程中的文本不处理
+    state = user_states[user_id]
+    text = update.message.text.strip()
 
     step = state.get("step")
     if step == "awaiting_quantity":
-        if not text.isdigit() or int(text) <= 0:
-            await msg.reply_text("数量请输入正整数。")
+        if not text.isdigit():
+            await update.message.reply_text("请输入有效的整数数量。")
             return
-        state["quantity"] = int(text)
+        state["quantity"] = text
         state["step"] = "awaiting_price"
-        await msg.reply_text("请输入价格（数字，可带小数）:")
+        await update.message.reply_text("请输入价格（数字）：")
 
     elif step == "awaiting_price":
         try:
-            price = float(text)
-            if price < 0:
-                raise ValueError
-            state["price"] = price
+            float(text)  # 只要能转成浮点数就行
+            state["price"] = text
             state["step"] = "awaiting_limit_type"
+
+            # 发送限制类型选择按钮
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("P", callback_data="limit_P"),
-                 InlineKeyboardButton("PP", callback_data="limit_PP"),
-                 InlineKeyboardButton("通用", callback_data="limit_general")]
+                [
+                    InlineKeyboardButton("P", callback_data="limit_P"),
+                    InlineKeyboardButton("PP", callback_data="limit_PP"),
+                    InlineKeyboardButton("通用", callback_data="limit_general"),
+                ]
             ])
-            await msg.reply_text("请选择限制类型:", reply_markup=keyboard)
+            await update.message.reply_text("请选择限制类型：", reply_markup=keyboard)
         except:
-            await msg.reply_text("价格格式错误，请输入数字。")
+            await update.message.reply_text("请输入有效的价格数字。")
 
     elif step == "awaiting_confirmation":
         if text == "是":
-            # 发送匿名消息到频道
-            template = data_json["config"].get("template", "数量：{quantity}\n价格：{price}\n限制类型：{limit_type}")
-            caption = template.format(
+            # 确认发布，发送到频道
+            tpl = data_json["config"]["template"]
+            info_text = tpl.format(
                 quantity=state["quantity"],
                 price=state["price"],
                 limit_type=state["limit_type"]
             )
-            if state["media_type"] == "photo":
-                await context.bot.send_photo(CHANNEL_ID, photo=state["file_id"], caption=caption)
-            else:
-                await context.bot.send_video(CHANNEL_ID, video=state["file_id"], caption=caption)
-            await msg.reply_text("发布成功！")
+            caption = info_text
+
+            try:
+                if state["media_type"] == "photo":
+                    await context.bot.send_photo(
+                        chat_id=CHANNEL_ID,
+                        photo=state["file_id"],
+                        caption=caption
+                    )
+                else:
+                    await context.bot.send_video(
+                        chat_id=CHANNEL_ID,
+                        video=state["file_id"],
+                        caption=caption
+                    )
+                await update.message.reply_text("发布成功！")
+            except Exception as e:
+                await update.message.reply_text(f"发布失败，错误：{e}")
+
             user_states.pop(user_id, None)
         elif text == "否":
-            await msg.reply_text("已取消发布。")
+            await update.message.reply_text("已取消发布。")
             user_states.pop(user_id, None)
         else:
-            await msg.reply_text("请回复“是”确认发布，或“否”取消。")
+            await update.message.reply_text('请回复“是”确认发布，或“否”取消。')
+
+    else:
+        # 其他情况忽略
+        pass
 
 
 async def settemplate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("无权限。")
         return
-    text = " ".join(context.args)
-    if not text:
-        await update.message.reply_text("用法：/settemplate 新模板文本（支持 {quantity}, {price}, {limit_type}）")
+    if not context.args:
+        await update.message.reply_text("用法：/settemplate 模板文本，模板中可用变量：{quantity} {price} {limit_type}")
         return
-    data_json["config"]["template"] = text
+    tpl_text = " ".join(context.args)
+    data_json["config"]["template"] = tpl_text
     save_data()
     await update.message.reply_text("模板已更新。")
+
 
 async def extend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -332,57 +351,72 @@ async def extend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         await update.message.reply_text("参数格式错误。")
         return
-    now = datetime.utcnow()
-    current_expire = data_json["whitelist"].get(str(user_id))
-    if current_expire:
-        try:
-            expire_dt = datetime.fromisoformat(current_expire)
-            if expire_dt < now:
-                expire_dt = now
-        except:
-            expire_dt = now
+    expire_str = data_json["whitelist"].get(str(user_id))
+    if expire_str:
+        expire_dt = datetime.fromisoformat(expire_str)
+        if expire_dt < datetime.utcnow():
+            expire_dt = datetime.utcnow()
     else:
-        expire_dt = now
+        expire_dt = datetime.utcnow()
     new_expire = expire_dt + timedelta(days=days)
     data_json["whitelist"][str(user_id)] = new_expire.isoformat()
     save_data()
-    await update.message.reply_text(f"用户 {user_id} 权限延长至 {new_expire.isoformat()}。")
+    await update.message.reply_text(f"用户 {user_id} 发布权限延长 {days} 天，有效期至 {new_expire}。")
 
 
-# --- Flask Webhook 接口 ---
+# --- Flask Webhook 路由 ---
 @flask_app.route(f"/{BOT_TOKEN}", methods=["POST"])
-def webhook_handler():
+def webhook():
+    """Flask 同步接口接收 Telegram Webhook"""
     json_data = request.get_json(force=True)
     update = Update.de_json(json_data, application.bot)
-    asyncio.run(application.update_queue.put(update))
+
+    # 使用 asyncio.create_task 发送更新到队列
+    asyncio.get_event_loop().create_task(application.update_queue.put(update))
+
     return "ok"
 
 
-# --- 主函数 ---
+# --- 主异步启动函数 ---
 async def main():
     global application
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # 绑定命令和消息处理
+    # 添加处理器
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_handler, pattern="^(apply_|limit_)"))
+    application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(CommandHandler("approve", approve))
     application.add_handler(CommandHandler("reject", reject))
     application.add_handler(CommandHandler("ban", ban))
     application.add_handler(CommandHandler("unban", unban))
     application.add_handler(CommandHandler("publish", publish))
-    application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, media_handler))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     application.add_handler(CommandHandler("settemplate", settemplate))
     application.add_handler(CommandHandler("extend", extend))
+    application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, media_handler))
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), text_handler))
 
     # 设置Webhook
     await application.bot.set_webhook(WEBHOOK_URL)
-    logger.info(f"Webhook 设置完成：{WEBHOOK_URL}")
+    logger.info(f"Webhook 设置完成: {WEBHOOK_URL}")
 
     # 启动 Flask
-    flask_app.run(host="0.0.0.0", port=PORT)
+    # Flask 运行阻塞，需在单独线程运行
+    import threading
+    def run_flask():
+        flask_app.run(host="0.0.0.0", port=PORT)
 
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
+
+    # 运行 Bot，处理更新队列
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()  # 用轮询启动Updater也可以，但这里用update_queue模式
+    await application.updater.idle()
 
 if __name__ == "__main__":
+    # 环境变量或你本地直接设置
+    if not BOT_TOKEN or not ADMIN_ID or not CHANNEL_ID or not WEBHOOK_URL:
+        print("请设置环境变量 BOT_TOKEN, ADMIN_ID, CHANNEL_ID, WEBHOOK_URL")
+        exit(1)
     asyncio.run(main())
