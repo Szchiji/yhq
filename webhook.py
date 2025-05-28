@@ -163,3 +163,12 @@ def set_webhook():
 # 启动 Flask
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    @app.route("/", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    application.update_queue.put_nowait(update)
+    return "ok"
+
+@app.route("/", methods=["GET", "HEAD"])
+def index():
+    return "Telegram bot webhook is running."
