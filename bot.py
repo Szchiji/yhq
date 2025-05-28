@@ -2,10 +2,7 @@ import os
 import json
 import logging
 from datetime import datetime, timedelta
-
-from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup,
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters,
     CallbackQueryHandler, ContextTypes,
@@ -17,7 +14,6 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-# 环境变量配置
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
@@ -29,7 +25,7 @@ user_states = {}
 def load_data():
     if not os.path.exists(DATA_FILE):
         data = {
-            "whitelist": {},  # user_id: expires_at ISO str
+            "whitelist": {},
             "banlist": [],
             "config": {
                 "template": "数量：{quantity}\n价格：{price}\n限制：{limit_type}"
@@ -58,7 +54,6 @@ async def is_whitelisted(user_id):
         return expires_at > datetime.utcnow()
     return False
 
-# /start 命令
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if await is_banned(user_id):
@@ -71,7 +66,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("请点击下方按钮申请发布权限：", reply_markup=reply_markup)
 
-# 回调查询处理
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -103,7 +97,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         expires_at = datetime.utcnow() + timedelta(days=30)
         data_json["whitelist"][str(user_id)] = expires_at.isoformat()
         save_data(data_json)
-
         await context.bot.send_message(chat_id=user_id, text="您的发布权限已被批准，有效期30天。")
         await query.edit_message_text("已批准用户的发布权限。")
 
@@ -112,7 +105,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=user_id, text="您的发布权限申请被拒绝。")
         await query.edit_message_text("已拒绝用户的发布权限。")
 
-# /ban 命令
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("您无权执行此操作。")
@@ -131,7 +123,6 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_data(data_json)
     await update.message.reply_text(f"已封禁用户 {user_id}。")
 
-# /publish 命令
 async def publish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if await is_banned(user_id):
@@ -143,7 +134,6 @@ async def publish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_states[user_id] = {"step": "awaiting_media"}
     await update.message.reply_text("请发送一张照片或一个视频。")
 
-# 处理照片/视频
 async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in user_states or user_states[user_id].get("step") != "awaiting_media":
@@ -166,7 +156,6 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     })
     await msg.reply_text("请发送优惠券数量和价格，格式：数量,价格（例如：3,100）")
 
-# 处理数量价格和限制
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in user_states:
@@ -211,7 +200,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text("发布取消。")
             user_states.pop(user_id, None)
 
-# 限制类型处理
 async def limit_type_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -235,8 +223,7 @@ async def limit_type_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"确认发布以下内容？\n数量：{state['quantity']}\n价格：{state['price']}\n限制：{state['limit_type']}\n\n发送“是”确认，发送其他取消。"
     )
 
-# 主函数
-async def main():
+def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -248,13 +235,7 @@ async def main():
     app.add_handler(CallbackQueryHandler(limit_type_handler, pattern="^limit_"))
 
     print("Bot started")
-    await app.run_polling()
+    app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-    try:
-        asyncio.get_event_loop().run_until_complete(main())
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(main())
+    main()
