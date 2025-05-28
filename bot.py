@@ -17,6 +17,7 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
+# 环境变量配置
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
@@ -111,7 +112,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=user_id, text="您的发布权限申请被拒绝。")
         await query.edit_message_text("已拒绝用户的发布权限。")
 
-# /ban 命令，管理员使用
+# /ban 命令
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("您无权执行此操作。")
@@ -130,7 +131,7 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_data(data_json)
     await update.message.reply_text(f"已封禁用户 {user_id}。")
 
-# /publish 命令，白名单用户使用
+# /publish 命令
 async def publish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if await is_banned(user_id):
@@ -142,7 +143,7 @@ async def publish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_states[user_id] = {"step": "awaiting_media"}
     await update.message.reply_text("请发送一张照片或一个视频。")
 
-# 处理用户发的照片或视频
+# 处理照片/视频
 async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in user_states or user_states[user_id].get("step") != "awaiting_media":
@@ -165,7 +166,7 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     })
     await msg.reply_text("请发送优惠券数量和价格，格式：数量,价格（例如：3,100）")
 
-# 处理文本消息，数量价格和限制类型选择
+# 处理数量价格和限制
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in user_states:
@@ -210,7 +211,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text("发布取消。")
             user_states.pop(user_id, None)
 
-# 处理优惠券限制类型选择
+# 限制类型处理
 async def limit_type_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -230,8 +231,11 @@ async def limit_type_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     }
     state["limit_type"] = limit_map.get(data, "通用")
     state["step"] = "awaiting_confirmation"
-    await query.edit_message_text(f"确认发布以下内容？\n数量：{state['quantity']}\n价格：{state['price']}\n限制：{state['limit_type']}\n\n发送“是”确认，发送其他取消。")
+    await query.edit_message_text(
+        f"确认发布以下内容？\n数量：{state['quantity']}\n价格：{state['price']}\n限制：{state['limit_type']}\n\n发送“是”确认，发送其他取消。"
+    )
 
+# 主函数
 async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -239,7 +243,6 @@ async def main():
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^(apply_|approve_|reject_)"))
     app.add_handler(CommandHandler("ban", ban))
     app.add_handler(CommandHandler("publish", publish))
-
     app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, media_handler))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), text_handler))
     app.add_handler(CallbackQueryHandler(limit_type_handler, pattern="^limit_"))
@@ -249,4 +252,9 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(main())
+    try:
+        asyncio.get_event_loop().run_until_complete(main())
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(main())
