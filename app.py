@@ -1,270 +1,181 @@
-import os
+import logging
 from flask import Flask, request
-from datetime import datetime, timedelta
-from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
-from sqlalchemy.orm import declarative_base, sessionmaker
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
+from telegram.ext import (
+    ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+)
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from models import Base, User, Draft, Coupon
 
-# === 配置区 ===
-TOKEN = os.environ.get('TOKEN')
-CHANNEL_ID = int(os.environ.get('CHANNEL_ID', '-1002669687216'))
-ADMIN_ID = int(os.environ.get('ADMIN_ID', '7848870377'))
-WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
-DATABASE_URL = os.environ.get('DATABASE_URL')
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# === 初始化 Flask & Bot ===
+# Flask 应用
 app = Flask(__name__)
-bot = Bot(token=TOKEN)
-dispatcher = Dispatcher(bot, update_queue=None, use_context=True)
 
-# === 数据库设置 ===
-Base = declarative_base()
+# Telegram Bot Token
+BOT_TOKEN = "7098191858:AAEOL8NazzqpCh9iJjv-YpkTUFukfEbdFyg"
+
+# 数据库配置
+DATABASE_URL = "postgresql://yhq_user:xuG8E0b9bVDdgF8mh6zHLpVE6hOUp9g2@dpg-d0sgh4qdbo4c73f2e5rg-a/yhq"
 engine = create_engine(DATABASE_URL)
-Session = sessionmaker(bind=engine)
-session = Session()
+SessionLocal = sessionmaker(bind=engine)
+Base.metadata.create_all(bind=engine)
 
-class UserStatus(Base):
-    __tablename__ = 'user_status'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, unique=True, nullable=False)
-    username = Column(String(100))
-    status = Column(String(20))  # 'whitelist' or 'banned'
-    last_publish = Column(DateTime)
-
-class Settings(Base):
-    __tablename__ = 'settings'
-    id = Column(Integer, primary_key=True)
-    key = Column(String(50), unique=True, nullable=False)
-    value = Column(Text)
-
-Base.metadata.create_all(engine)
-
-# === 工具函数 ===
-def get_setting(key, default=None):
-    s = session.query(Settings).filter_by(key=key).first()
-    return s.value if s else default
-
-def set_setting(key, value):
-    s = session.query(Settings).filter_by(key=key).first()
-    if s:
-        s.value = value
-    else:
-        s = Settings(key=key, value=value)
-        session.add(s)
-    session.commit()
-
-def get_user_by_id_or_username(identifier):
-    try:
-        user_id = int(identifier)
-        return session.query(UserStatus).filter_by(user_id=user_id).first()
-    except ValueError:
-        return session.query(UserStatus).filter_by(username=identifier.lstrip("@")).first()
-
-# === 状态缓存 ===
+# 用户状态
 user_states = {}
 
-# === 指令 ===
-def start(update: Update, context: CallbackContext):
-    user = update.effective_user
-    mention = f"@{user.username}" if user.username else "无用户名"
-    bot.send_message(
-        chat_id=ADMIN_ID,
-        text=f"📢 发布权限申请：\n👤 昵称：{user.full_name}\n🔗 用户名：{mention}\n🆔 用户ID：{user.id}\n\n使用 /approve <用户ID或@用户名> 通过。"
-    )
-    update.message.reply_text("你的申请已提交，请等待管理员审核。")
+# 发布会话缓存
+publish_sessions = {}
 
-def approve(update: Update, context: CallbackContext):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    try:
-        identifier = context.args[0]
-        user_data = get_user_by_id_or_username(identifier)
-        if not user_data:
-            # 新建记录
-            user_id = int(identifier.lstrip("@")) if identifier.isdigit() else None
-            user_data = UserStatus(user_id=user_id, username=identifier.lstrip("@"), status='whitelist')
-            session.add(user_data)
+# 状态常量
+STATE_AWAIT_MEDIA = "awaiting_media"
+STATE_AWAIT_QUANTITY = "awaiting_quantity"
+STATE_AWAIT_PRICE = "awaiting_price"
+STATE_AWAIT_LIMIT = "awaiting_limit"
+STATE_CONFIRM = "confirm_publish"
+
+# 开始命令处理
+async def send_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    telegram_id = update.effective_user.id
+    username = update.effective_user.username
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        if not user:
+            user = User(telegram_id=telegram_id, username=username, is_member=False)
+            db.add(user)
+            db.commit()
+        if user.is_member:
+            await update.message.reply_text("欢迎会员，您可以发送 /publish 开始发布内容。")
         else:
-            user_data.status = 'whitelist'
-        session.commit()
+            await update.message.reply_text("您好，您当前未被审核为会员，请等待管理员审核。")
 
-        if user_data.user_id:
-            bot.send_message(chat_id=user_data.user_id, text="✅ 你已获得发布权限，使用 /publish 发布内容。")
-        update.message.reply_text(f"{identifier} 已添加到白名单。")
-    except Exception as e:
-        print("approve error:", e)
-        update.message.reply_text("用法：/approve <用户ID 或 @用户名>")
-
-def ban(update: Update, context: CallbackContext):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    try:
-        identifier = context.args[0]
-        user_data = get_user_by_id_or_username(identifier)
-        if not user_data:
-            user_data = UserStatus(user_id=int(identifier), status='banned')
-            session.add(user_data)
-        else:
-            user_data.status = 'banned'
-        session.commit()
-        if user_data.user_id:
-            bot.send_message(chat_id=user_data.user_id, text="🚫 你已被封禁。")
-        update.message.reply_text(f"{identifier} 已封禁。")
-    except:
-        update.message.reply_text("用法：/ban <用户ID 或 @用户名>")
-
-def unban(update: Update, context: CallbackContext):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    try:
-        identifier = context.args[0]
-        user_data = get_user_by_id_or_username(identifier)
-        if user_data:
-            user_data.status = None
-            session.commit()
-            update.message.reply_text(f"{identifier} 已解除封禁。")
-    except:
-        update.message.reply_text("用法：/unban <用户ID 或 @用户名>")
-
-def set_template(update: Update, context: CallbackContext):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    tpl = update.message.text.replace("/settpl", "").strip()
-    if tpl:
-        set_setting("template", tpl)
-        update.message.reply_text("模板已更新。")
-    else:
-        update.message.reply_text("用法：/settpl 模板内容")
-
-def help_command(update: Update, context: CallbackContext):
-    update.message.reply_text("使用说明：\n/start - 申请发布权限\n/publish - 发布内容\n管理员命令：/approve /ban /unban /settpl")
-
-def publish(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    user = session.query(UserStatus).filter_by(user_id=user_id).first()
-    if not user or user.status != 'whitelist':
-        update.message.reply_text("你没有发布权限，请先使用 /start 申请。")
-        return
-    if user.status == 'banned':
-        update.message.reply_text("你已被封禁。")
-        return
-    if user.last_publish and datetime.now() - user.last_publish < timedelta(days=3):
-        update.message.reply_text("你每 3 天只能发布一次，请稍后再试。")
-        return
-    user_states[user_id] = {"step": 1, "start_time": datetime.now()}
-    update.message.reply_text("请发送你要发布的图片或视频：")
-
-# === 发布流程 ===
-def handle_media(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    state = user_states.get(user_id)
-    if not state:
-        return
-    if datetime.now() - state.get("start_time", datetime.now()) > timedelta(minutes=30):
-        user_states.pop(user_id, None)
-        update.message.reply_text("操作超时，请重新开始 /publish。")
-        return
-
-    step = state["step"]
-    msg = update.message
-    if step == 1:
-        if msg.photo:
-            state["media"] = msg.photo[-1].file_id
-            state["type"] = "photo"
-        elif msg.video:
-            state["media"] = msg.video.file_id
-            state["type"] = "video"
-        else:
-            msg.reply_text("请发送图片或视频")
+# 发布命令处理
+async def start_publish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    telegram_id = update.effective_user.id
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        if not user or not user.is_member:
+            await update.message.reply_text("抱歉，您不是会员，没有发布权限。")
             return
-        state["step"] = 2
-        msg.reply_text("请输入数量：")
+        user.status = STATE_AWAIT_MEDIA
+        db.commit()
+    publish_sessions[telegram_id] = {
+        "coupons": [],
+        "current_coupon": {},
+        "media_file_id": None,
+        "media_type": None
+    }
+    await update.message.reply_text("请发送一张照片或者视频开始发布。")
 
-    elif step == 2:
-        state["amount"] = msg.text
-        state["step"] = 3
-        msg.reply_text("请输入价格：")
-
-    elif step == 3:
-        state["price"] = msg.text
-        state["step"] = 4
-        msg.reply_text("请输入限制类型（如：仅限女性）：")
-
-    elif step == 4:
-        state["limit"] = msg.text
-        state["step"] = 5
-        tpl = get_setting("template", "【公告】")
-        caption = tpl.format_map({
-            "amount": state["amount"],
-            "price": state["price"],
-            "limit": state["limit"]
-        }) if "{" in tpl else f"{tpl}\n数量：{state['amount']}\n价格：{state['price']}\n限制：{state['limit']}"
-        state["caption"] = caption
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ 确认发布", callback_data=f"confirm_{user_id}"),
-             InlineKeyboardButton("❌ 取消", callback_data=f"cancel_{user_id}")]
-        ])
-        if state["type"] == "photo":
-            bot.send_photo(chat_id=user_id, photo=state["media"], caption=caption, reply_markup=keyboard)
+# 消息处理
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    telegram_id = update.effective_user.id
+    text = update.message.text if update.message.text else ""
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        if not user or not user.is_member:
+            await update.message.reply_text("您未被授权发布内容。")
+            return
+        state = user.status
+        if state == STATE_AWAIT_MEDIA:
+            if update.message.photo:
+                file_id = update.message.photo[-1].file_id
+                media_type = "photo"
+            elif update.message.video:
+                file_id = update.message.video.file_id
+                media_type = "video"
+            else:
+                await update.message.reply_text("请发送一张照片或视频。")
+                return
+            publish_sessions[telegram_id]["media_file_id"] = file_id
+            publish_sessions[telegram_id]["media_type"] = media_type
+            user.status = STATE_AWAIT_QUANTITY
+            db.commit()
+            await update.message.reply_text("请发送优惠券数量。")
+        elif state == STATE_AWAIT_QUANTITY:
+            if not text.isdigit():
+                await update.message.reply_text("请输入优惠券数量（数字）。")
+                return
+            publish_sessions[telegram_id]["current_coupon"]["quantity"] = int(text)
+            user.status = STATE_AWAIT_PRICE
+            db.commit()
+            await update.message.reply_text("请发送优惠券价格。")
+        elif state == STATE_AWAIT_PRICE:
+            if not text:
+                await update.message.reply_text("请输入优惠券价格。")
+                return
+            publish_sessions[telegram_id]["current_coupon"]["price"] = text
+            user.status = STATE_AWAIT_LIMIT
+            db.commit()
+            await update.message.reply_text("请发送限制类型（如：限 P / 限 PP / 通用）。")
+        elif state == STATE_AWAIT_LIMIT:
+            if not text:
+                await update.message.reply_text("请输入限制类型（如：限 P / 限 PP / 通用）。")
+                return
+            publish_sessions[telegram_id]["current_coupon"]["limit_type"] = text
+            coupon = publish_sessions[telegram_id]["current_coupon"]
+            publish_sessions[telegram_id]["coupons"].append(coupon)
+            publish_sessions[telegram_id]["current_coupon"] = {}
+            user.status = STATE_CONFIRM
+            db.commit()
+            keyboard = [
+                [InlineKeyboardButton("继续添加", callback_data="add_more")],
+                [InlineKeyboardButton("完成发布", callback_data="finish")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text("优惠券已添加，是否继续添加？", reply_markup=reply_markup)
         else:
-            bot.send_video(chat_id=user_id, video=state["media"], caption=caption, reply_markup=keyboard)
-        msg.reply_text("这是你的发布预览，请点击下方按钮确认或取消。")
+            await update.message.reply_text("请使用 /publish 命令开始发布流程。")
 
-def handle_confirm(update: Update, context: CallbackContext):
+# 按钮处理
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = int(query.data.split("_")[1])
-    state = user_states.pop(user_id, None)
-    if not state:
-        query.edit_message_caption(caption="发布失败：内容丢失。")
-        return
-    if state["type"] == "photo":
-        bot.send_photo(chat_id=CHANNEL_ID, photo=state["media"], caption=state["caption"])
-    else:
-        bot.send_video(chat_id=CHANNEL_ID, video=state["media"], caption=state["caption"])
-    user = session.query(UserStatus).filter_by(user_id=user_id).first()
-    if user:
-        user.last_publish = datetime.now()
-        session.commit()
-    query.edit_message_caption(caption="✅ 发布成功！")
-
-def handle_cancel(update: Update, context: CallbackContext):
-    query = update.callback_query
-    user_id = int(query.data.split("_")[1])
-    user_states.pop(user_id, None)
-    query.edit_message_caption(caption="❌ 已取消发布。")
-
-# === 注册 Handler ===
-dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CommandHandler("approve", approve))
-dispatcher.add_handler(CommandHandler("ban", ban))
-dispatcher.add_handler(CommandHandler("unban", unban))
-dispatcher.add_handler(CommandHandler("settpl", set_template))
-dispatcher.add_handler(CommandHandler("publish", publish))
-dispatcher.add_handler(CommandHandler("help", help_command))
-dispatcher.add_handler(CallbackQueryHandler(handle_confirm, pattern=r"^confirm_\d+$"))
-dispatcher.add_handler(CallbackQueryHandler(handle_cancel, pattern=r"^cancel_\d+$"))
-dispatcher.add_handler(MessageHandler(Filters.photo | Filters.video | Filters.text, handle_media))
-
-# === Webhook 路由 ===
-@app.route("/", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
-    return "ok"
-
-@app.route("/", methods=["GET"])
-def index():
-    return "Bot is running."
-
-@app.route("/set_webhook", methods=["GET"])
-def set_webhook():
-    if not WEBHOOK_URL:
-        return "请设置环境变量 WEBHOOK_URL"
-    success = bot.set_webhook(WEBHOOK_URL)
-    return f"Webhook 设置成功: {success}"
-
-# === 启动 Flask ===
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    telegram_id = query.from_user.id
+    await query.answer()
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        if not user:
+            await query.edit_message_text("用户信息未找到。")
+            return
+        if query.data == "add_more":
+            user.status = STATE_AWAIT_QUANTITY
+            db.commit()
+            await query.edit_message_text("请发送优惠券数量。")
+        elif query.data == "finish":
+            user.status = ""
+            db.commit()
+            session = publish_sessions.get(telegram_id)
+            if not session:
+                await query.edit_message_text("发布会话超时，请重新开始。")
+                return
+            media_type = session["media_type"]
+            media_file_id = session["media_file_id"]
+            coupon_texts = []
+            for i, c in enumerate(session["coupons"], 1):
+                coupon_texts.append(
+                    f"{i}. 数量: {c['quantity']}，价格: {c['price']}，限制: {c['limit_type']}"
+                )
+            coupons_str = "\n".join(coupon_texts)
+            preview_text = f"【发布预览】\n\n媒体类型：{media_type}\n优惠券列表：\n{coupons_str}\n\n选择发布或取消。"
+            keyboard = [
+                [InlineKeyboardButton("发布", callback_data="publish")],
+                [InlineKeyboardButton("取消", callback_data="cancel")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            if media_type == "photo":
+                await query.edit_message_media(
+                    media=InputMediaPhoto(media=media_file_id, caption=preview_text),
+                    reply_markup=reply_markup
+                )
+            elif media_type == "video":
+                await query.edit_message_media(
+                    media=InputMediaVideo(media=media_file_id, caption=preview_text),
+                    reply_markup=reply_markup
+                )
+        elif query.data == "publish":
+            session = publish_sessions.get(telegram_id)
+            if not session:
+                await query.edit_message_text("发布 
