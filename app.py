@@ -153,7 +153,7 @@ def handle_media(update: Update, context: CallbackContext):
             state["media"] = msg.video.file_id
             state["type"] = "video"
         else:
-            msg.reply_text("请发送图片或视频")
+            msg.reply_text("请发送一张图片或视频")
             return
         state["step"] = 2
         msg.reply_text("请输入优惠券数量：")
