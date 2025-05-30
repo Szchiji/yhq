@@ -6,7 +6,7 @@ from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, Ca
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# === 配置区 ===
+# === 环境配置 ===
 TOKEN = os.environ.get('TOKEN')
 CHANNEL_ID = int(os.environ.get('CHANNEL_ID', '-1002669687216'))
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '7848870377'))
@@ -28,7 +28,7 @@ class UserStatus(Base):
     __tablename__ = 'user_status'
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, unique=True, nullable=False)
-    status = Column(String(20))  # 'whitelist' or 'banned'
+    status = Column(String(20))
     last_publish = Column(DateTime)
 
 class Settings(Base):
@@ -52,14 +52,30 @@ def set_setting(key, value):
         session.add(s)
     session.commit()
 
-# === 用户状态缓存 ===
+# === 状态缓存 ===
 user_states = {}
 
 # === 指令 ===
 def start(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    bot.send_message(chat_id=ADMIN_ID, text=f'用户 {user_id} 请求发布权限。\n使用 /approve {user_id} 通过。')
-    update.message.reply_text('你的申请已提交，请等待管理员审核。')
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ 通过", callback_data=f"approve_{user_id}"),
+         InlineKeyboardButton("❌ 拒绝", callback_data=f"reject_{user_id}")]
+    ])
+    bot.send_message(chat_id=ADMIN_ID, text=f"用户 {user_id} 请求发布权限。", reply_markup=keyboard)
+    update.message.reply_text("你的申请已提交，请等待管理员审核。")
+
+def help_command(update: Update, context: CallbackContext):
+    update.message.reply_text(
+        "命令列表：\n"
+        "/start - 申请发布权限\n"
+        "/publish - 开始发布流程\n"
+        "/help - 显示帮助信息\n"
+        "/settpl 模板内容 - 设置发布模板（管理员）\n"
+        "/approve 用户ID - 手动通过（管理员）\n"
+        "/ban 用户ID - 封禁用户\n"
+        "/unban 用户ID - 解封用户"
+    )
 
 def approve(update: Update, context: CallbackContext):
     if update.effective_user.id != ADMIN_ID:
@@ -124,17 +140,12 @@ def publish(update: Update, context: CallbackContext):
     if not user or user.status != 'whitelist':
         update.message.reply_text("你没有发布权限，请先使用 /start 申请。")
         return
-    if user.status == 'banned':
-        update.message.reply_text("你已被封禁。")
-        return
     if user.last_publish and datetime.now() - user.last_publish < timedelta(days=3):
         update.message.reply_text("你每 3 天只能发布一次，请稍后再试。")
         return
-
     user_states[user_id] = {"step": 1, "start_time": datetime.now()}
     update.message.reply_text("请发送你要发布的图片或视频：")
 
-# === 发布流程 ===
 def handle_media(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     state = user_states.get(user_id)
@@ -213,18 +224,45 @@ def handle_cancel(update: Update, context: CallbackContext):
     user_states.pop(user_id, None)
     query.edit_message_caption(caption="❌ 已取消发布。")
 
-# === 注册 Handler ===
+def handle_approval_callback(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query_data = query.data
+    admin_id = update.effective_user.id
+
+    if admin_id != ADMIN_ID:
+        query.answer("无权限")
+        return
+
+    if query_data.startswith("approve_"):
+        user_id = int(query_data.split("_")[1])
+        user = session.query(UserStatus).filter_by(user_id=user_id).first()
+        if not user:
+            user = UserStatus(user_id=user_id, status='whitelist')
+            session.add(user)
+        else:
+            user.status = 'whitelist'
+        session.commit()
+        bot.send_message(chat_id=user_id, text='你已获得发布权限，使用 /publish 发布内容。')
+        query.edit_message_text(text=f"✅ 用户 {user_id} 已通过审核")
+    elif query_data.startswith("reject_"):
+        user_id = int(query_data.split("_")[1])
+        bot.send_message(chat_id=user_id, text="你的发布申请被管理员拒绝。")
+        query.edit_message_text(text=f"❌ 用户 {user_id} 的申请已被拒绝")
+
+# === 注册 handler ===
 dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(CommandHandler("help", help_command))
 dispatcher.add_handler(CommandHandler("approve", approve))
 dispatcher.add_handler(CommandHandler("ban", ban))
 dispatcher.add_handler(CommandHandler("unban", unban))
 dispatcher.add_handler(CommandHandler("settpl", set_template))
 dispatcher.add_handler(CommandHandler("publish", publish))
+dispatcher.add_handler(MessageHandler(Filters.photo | Filters.video | Filters.text, handle_media))
 dispatcher.add_handler(CallbackQueryHandler(handle_confirm, pattern=r"^confirm_\d+$"))
 dispatcher.add_handler(CallbackQueryHandler(handle_cancel, pattern=r"^cancel_\d+$"))
-dispatcher.add_handler(MessageHandler(Filters.photo | Filters.video | Filters.text, handle_media))
+dispatcher.add_handler(CallbackQueryHandler(handle_approval_callback, pattern=r"^(approve|reject)_\d+$"))
 
-# === Webhook 路由 ===
+# === Flask 路由 ===
 @app.route("/", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
@@ -238,11 +276,11 @@ def index():
 @app.route("/set_webhook", methods=["GET"])
 def set_webhook():
     if not WEBHOOK_URL:
-        return "请设置环境变量 WEBHOOK_URL"
+        return "请设置 WEBHOOK_URL"
     success = bot.set_webhook(WEBHOOK_URL)
     return f"Webhook 设置成功: {success}"
 
-# === 启动 Flask ===
+# === 启动 ===
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
