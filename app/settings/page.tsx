@@ -394,7 +394,7 @@ export default function SettingsPage() {
                   type="number"
                   min="1"
                   value={newPrize.quantity}
-                  onChange={(e) => setNewPrize({ ...newPrize, quantity: parseInt(e.target.value) || 1 })}
+                  onChange={(e) => setNewPrize({ ...newPrize, quantity: parseInt(e.target.value, 10) || 1 })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
