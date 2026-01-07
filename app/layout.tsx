@@ -3,8 +3,8 @@ import './globals.css'
 import Sidebar from '@/components/Sidebar'
 
 export const metadata: Metadata = {
-  title: 'Lottery Bot Management',
-  description: 'Dashboard for managing lottery bot',
+  title: '抽奖机器人管理后台',
+  description: 'Telegram 抽奖机器人管理系统',
 }
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
       <body className="font-sans">
         <div className="flex min-h-screen bg-gray-100">
           <Sidebar />
