@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 
 type RichTextEditorProps = {
   value: string
@@ -30,10 +30,10 @@ export default function RichTextEditor({
   minHeight = '300px',
   className = '',
 }: RichTextEditorProps) {
-  const [selectionStart, setSelectionStart] = useState(0)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const insertFormat = (format: string) => {
-    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    const textarea = textareaRef.current
     if (!textarea) return
 
     const start = textarea.selectionStart
@@ -80,9 +80,9 @@ export default function RichTextEditor({
 
         {/* Content Area */}
         <textarea
+          ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onSelect={(e) => setSelectionStart((e.target as HTMLTextAreaElement).selectionStart)}
           className="w-full p-4 font-mono text-sm focus:outline-none"
           style={{ minHeight }}
           placeholder={placeholder}

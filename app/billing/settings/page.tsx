@@ -7,6 +7,7 @@ export default function BillingSettingsPage() {
   const [defaultPrice, setDefaultPrice] = useState('')
   const [currency, setCurrency] = useState('USDT')
   const [paymentInstructions, setPaymentInstructions] = useState('')
+  const [showSuccess, setShowSuccess] = useState(false)
 
   const handleSave = () => {
     console.log('Saving billing settings:', {
@@ -15,12 +16,19 @@ export default function BillingSettingsPage() {
       currency,
       paymentInstructions,
     })
-    alert('设置已保存')
+    setShowSuccess(true)
+    setTimeout(() => setShowSuccess(false), 3000)
   }
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-800">收费设置</h1>
+
+      {showSuccess && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800">
+          设置已保存
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow p-6 space-y-6">
         <div>

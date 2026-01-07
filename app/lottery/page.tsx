@@ -431,7 +431,10 @@ export default function LotteryPage() {
                   type="number"
                   min="1"
                   value={newPrize.total}
-                  onChange={(e) => setNewPrize({ ...newPrize, total: parseInt(e.target.value, 10) || 1 })}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10)
+                    setNewPrize({ ...newPrize, total: val > 0 ? val : 1 })
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

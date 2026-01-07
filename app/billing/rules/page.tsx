@@ -6,7 +6,7 @@ import DataTable from '@/components/DataTable'
 type Rule = {
   id: number
   name: string
-  duration: string
+  duration: number
   price: string
   status: string
 }
@@ -16,7 +16,7 @@ export default function BillingRulesPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [newRule, setNewRule] = useState({ 
     name: '', 
-    duration: '30',
+    duration: 30,
     price: '',
   })
 
@@ -62,7 +62,7 @@ export default function BillingRulesPage() {
           status: '启用',
         },
       ])
-      setNewRule({ name: '', duration: '30', price: '' })
+      setNewRule({ name: '', duration: 30, price: '' })
       setShowAddModal(false)
     }
   }
@@ -105,7 +105,10 @@ export default function BillingRulesPage() {
                 <input
                   type="number"
                   value={newRule.duration}
-                  onChange={(e) => setNewRule({ ...newRule, duration: e.target.value })}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10)
+                    setNewRule({ ...newRule, duration: val > 0 ? val : 1 })
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="30"
                 />
