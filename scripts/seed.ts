@@ -20,7 +20,7 @@ async function main() {
   // Note: Using a simple default password for easy initial setup
   // Users MUST change this password after first login
   const hashedPassword = await hash('admin123', 10)
-  const admin = await prisma.user.create({
+  await prisma.user.create({
     data: {
       username: 'admin',
       password: hashedPassword,

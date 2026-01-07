@@ -4,7 +4,16 @@ import { cookies } from 'next/headers'
 import { JWT_SECRET, JWT_EXPIRES_IN, COOKIE_NAME } from './constants'
 import { prisma } from './prisma'
 
-const secret = JWT_SECRET || 'dev-secret-key-change-in-production'
+function getSecret(): string {
+  if (!JWT_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET must be set in production environment')
+    }
+    console.warn('⚠️  Using fallback JWT secret for development only')
+    return 'dev-secret-key-change-in-production'
+  }
+  return JWT_SECRET
+}
 
 // Hash password
 export async function hashPassword(password: string): Promise<string> {
@@ -18,6 +27,7 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 
 // Sign JWT token
 export async function signToken(payload: { userId: string; username: string; role: string }): Promise<string> {
+  const secret = getSecret()
   const encodedSecret = new TextEncoder().encode(secret)
   const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
@@ -30,6 +40,7 @@ export async function signToken(payload: { userId: string; username: string; rol
 // Verify JWT token
 export async function verifyToken(token: string): Promise<{ userId: string; username: string; role: string } | null> {
   try {
+    const secret = getSecret()
     const encodedSecret = new TextEncoder().encode(secret)
     const { payload } = await jwtVerify(token, encodedSecret)
     return {
