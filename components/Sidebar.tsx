@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import type { UserProfile } from '@/types'
 
 type MenuItem = {
   name: string
@@ -35,18 +36,11 @@ const menuItems: MenuItem[] = [
   },
 ]
 
-type User = {
-  id: string
-  username: string
-  email: string | null
-  role: string
-}
-
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['定时发送', '收费管理'])
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<UserProfile | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
   const [logoutError, setLogoutError] = useState('')
 
@@ -82,10 +76,16 @@ export default function Sidebar() {
     } catch (error) {
       setLoggingOut(false)
       setLogoutError('退出登录失败，请重试')
-      // Auto-clear error after 3 seconds
-      setTimeout(() => setLogoutError(''), 3000)
     }
   }
+
+  // Auto-clear logout error after 3 seconds
+  useEffect(() => {
+    if (logoutError) {
+      const timer = setTimeout(() => setLogoutError(''), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [logoutError])
 
   const renderMenuItem = (item: MenuItem, level = 0) => {
     if (item.children) {

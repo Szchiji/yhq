@@ -21,7 +21,11 @@ const publicRoutes = ['/login', '/register']
 
 async function verifyToken(token: string): Promise<boolean> {
   try {
-    const secret = process.env.JWT_SECRET || 'dev-secret-key-change-in-production'
+    const secret = process.env.JWT_SECRET
+    if (!secret) {
+      console.error('JWT_SECRET is not set')
+      return false
+    }
     const encodedSecret = new TextEncoder().encode(secret)
     await jwtVerify(token, encodedSecret)
     return true
