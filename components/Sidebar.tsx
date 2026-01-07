@@ -48,6 +48,7 @@ export default function Sidebar() {
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['定时发送', '收费管理'])
   const [user, setUser] = useState<User | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutError, setLogoutError] = useState('')
 
   useEffect(() => {
     // Fetch current user
@@ -73,13 +74,16 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     setLoggingOut(true)
+    setLogoutError('')
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
       router.push('/login')
       router.refresh()
     } catch (error) {
       setLoggingOut(false)
-      alert('退出登录失败，请重试')
+      setLogoutError('退出登录失败，请重试')
+      // Auto-clear error after 3 seconds
+      setTimeout(() => setLogoutError(''), 3000)
     }
   }
 
@@ -168,6 +172,11 @@ export default function Sidebar() {
               <p className="text-blue-200 text-sm truncate">{user.email}</p>
             )}
           </div>
+          {logoutError && (
+            <div className="mb-3 p-2 bg-red-100 border border-red-400 text-red-700 text-sm rounded">
+              {logoutError}
+            </div>
+          )}
           <button
             onClick={handleLogout}
             disabled={loggingOut}

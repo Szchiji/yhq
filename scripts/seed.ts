@@ -17,6 +17,8 @@ async function main() {
   }
 
   // Create default superadmin
+  // Note: Using a simple default password for easy initial setup
+  // Users MUST change this password after first login
   const hashedPassword = await hash('admin123', 10)
   const admin = await prisma.user.create({
     data: {

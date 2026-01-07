@@ -4,6 +4,8 @@ import { cookies } from 'next/headers'
 import { JWT_SECRET, JWT_EXPIRES_IN, COOKIE_NAME } from './constants'
 import { prisma } from './prisma'
 
+const secret = JWT_SECRET || 'dev-secret-key-change-in-production'
+
 // Hash password
 export async function hashPassword(password: string): Promise<string> {
   return await hash(password, 10)
@@ -16,20 +18,20 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 
 // Sign JWT token
 export async function signToken(payload: { userId: string; username: string; role: string }): Promise<string> {
-  const secret = new TextEncoder().encode(JWT_SECRET)
+  const encodedSecret = new TextEncoder().encode(secret)
   const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(JWT_EXPIRES_IN)
-    .sign(secret)
+    .sign(encodedSecret)
   return token
 }
 
 // Verify JWT token
 export async function verifyToken(token: string): Promise<{ userId: string; username: string; role: string } | null> {
   try {
-    const secret = new TextEncoder().encode(JWT_SECRET)
-    const { payload } = await jwtVerify(token, secret)
+    const encodedSecret = new TextEncoder().encode(secret)
+    const { payload } = await jwtVerify(token, encodedSecret)
     return {
       userId: payload.userId as string,
       username: payload.username as string,
