@@ -119,7 +119,10 @@ export async function POST(request: NextRequest) {
         try {
           const lottery = await prisma.lottery.findUnique({
             where: { id: lotteryId },
-            include: { publishes: true }
+            include: { 
+              publishes: true,
+              channels: true
+            }
           })
           
           if (!lottery) {
@@ -144,13 +147,13 @@ export async function POST(request: NextRequest) {
           
           // 推送到所有群组
           let successCount = 0
-          const channels = lottery.requireChannels || []
-          for (const targetChatId of channels) {
+          const channels = lottery.channels || []
+          for (const channel of channels) {
             try {
-              await publishLottery(lotteryId, targetChatId, userId)
+              await publishLottery(lotteryId, channel.chatId, userId)
               successCount++
             } catch (e) {
-              console.error(`Failed to publish to ${targetChatId}:`, e)
+              console.error(`Failed to publish to ${channel.chatId}:`, e)
             }
           }
           

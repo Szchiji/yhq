@@ -11,6 +11,14 @@ type Prize = {
   remaining: number
 }
 
+type Channel = {
+  id: string
+  chatId: string
+  title: string
+  type: string
+  username?: string | null
+}
+
 type Lottery = {
   id: string
   title: string
@@ -22,6 +30,7 @@ type Lottery = {
   createdAt: string
   drawnAt?: string
   prizes: Prize[]
+  channels?: Channel[]
   _count: {
     participants: number
     winners: number
@@ -259,6 +268,30 @@ export default function LotteryDetailPage({ params }: { params: { id: string } }
                   </div>
                 )}
               </div>
+
+              {lottery.channels && lottery.channels.length > 0 && (
+                <div>
+                  <h3 className="text-sm sm:text-base font-medium text-gray-800 mb-3">参与条件 - 需加入的群组/频道</h3>
+                  <div className="space-y-2">
+                    {lottery.channels.map((channel) => (
+                      <div
+                        key={channel.id}
+                        className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded"
+                      >
+                        <span className="text-xs sm:text-sm text-gray-800">
+                          {channel.title}
+                          {channel.username && (
+                            <span className="text-gray-400 ml-1">@{channel.username}</span>
+                          )}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {channel.type === 'channel' ? '频道' : '群组'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

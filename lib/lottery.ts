@@ -190,11 +190,94 @@ export async function checkScheduledDraws() {
   return results
 }
 
+// 默认推送模板
+const DEFAULT_PUBLISH_TEMPLATE = `🎁 抽奖标题：{lotteryTitle}
+
+📦 抽奖说明：
+{lotteryDesc}
+
+🎫 参与条件：
+{channelList}
+
+🎁 奖品内容：
+{prizeList}
+
+📅 开奖时间：{drawTime} {drawType}
+👉 参与抽奖链接：{joinLink}`
+
+// 抽奖数据类型（用于构建消息）
+type LotteryWithRelations = {
+  id: string
+  title: string
+  description?: string | null
+  drawType: string
+  drawTime?: Date | null
+  drawCount?: number | null
+  creatorUsername?: string
+  channels?: Array<{ 
+    chatId: string
+    title: string 
+  }>
+  prizes?: Array<{ 
+    name: string
+    total: number 
+  }>
+  _count?: {
+    participants?: number
+  }
+}
+
+// 构建推送消息
+export function buildPublishMessage(lottery: LotteryWithRelations, botUsername: string): string {
+  const channelList = lottery.channels && lottery.channels.length > 0
+    ? lottery.channels.map((c) => `🎫 加入-${c.title}`).join('\n')
+    : '无需加入频道/群组'
+  
+  const prizeList = lottery.prizes && lottery.prizes.length > 0
+    ? lottery.prizes.map((p) => `💰 ${p.name} × ${p.total}`).join('\n')
+    : '暂无奖品'
+  
+  const drawTime = lottery.drawTime 
+    ? new Date(lottery.drawTime).toLocaleString('zh-CN')
+    : ''
+  
+  const drawType = lottery.drawType === 'time' 
+    ? '自动开奖' 
+    : `满${lottery.drawCount}人开奖`
+  
+  const joinLink = `https://t.me/${botUsername}?start=lottery_${lottery.id}`
+  
+  let message = (lottery as any).publishTemplate || DEFAULT_PUBLISH_TEMPLATE
+  
+  message = message
+    .replace(/{lotteryTitle}/g, lottery.title || '')
+    .replace(/{lotteryDesc}/g, lottery.description || '')
+    .replace(/{creator}/g, lottery.creatorUsername ? `@${lottery.creatorUsername}` : '')
+    .replace(/{channelList}/g, channelList)
+    .replace(/{prizeList}/g, prizeList)
+    .replace(/{drawTime}/g, drawTime)
+    .replace(/{drawType}/g, drawType)
+    .replace(/{joinCount}/g, String(lottery._count?.participants || 0))
+    .replace(/{joinLink}/g, joinLink)
+    .replace(/{botUsername}/g, botUsername)
+  
+  return message
+}
+
 // 推送抽奖消息
 export async function publishLottery(lotteryId: string, chatId: string, publishedBy: string) {
   const lottery = await prisma.lottery.findUnique({
     where: { id: lotteryId },
-    include: { prizes: true, participants: true }
+    include: { 
+      prizes: true, 
+      participants: true,
+      channels: true,
+      _count: {
+        select: {
+          participants: true
+        }
+      }
+    }
   })
 
   if (!lottery) {
@@ -211,28 +294,10 @@ export async function publishLottery(lotteryId: string, chatId: string, publishe
   }
 
   // 构建消息内容
-  const goodsList = lottery.prizes.map(p => `${p.name} x${p.total}`).join(', ')
-  const joinCondition = lottery.requireUsername 
-    ? '需要设置用户名' 
-    : (lottery.requireChannels && lottery.requireChannels.length > 0 
-        ? '需要加入指定频道/群组' 
-        : '无限制')
-  const openCondition = lottery.drawType === 'time' 
-    ? `${lottery.drawTime?.toLocaleString('zh-CN')} 定时开奖` 
-    : `满 ${lottery.drawCount} 人开奖`
-
-  const message = replaceTemplateVariables(lottery.publishTemplate || 
-    '🎉 {lotteryTitle}\n\n{lotteryDesc}\n\n🎁 奖品：{goodsList}\n👥 参与条件：{joinCondition}\n⏰ 开奖条件：{openCondition}\n\n当前参与：{joinNum} 人', {
-    lotteryTitle: lottery.title,
-    lotteryDesc: lottery.description || '',
-    goodsList,
-    joinCondition,
-    openCondition,
-    joinNum: lottery.participants.length
-  })
+  const botUsername = await getBotUsername()
+  const message = buildPublishMessage(lottery, botUsername)
 
   // 发送消息
-  const botUsername = await getBotUsername()
   const result = await sendMessage(chatId, message, {
     reply_markup: {
       inline_keyboard: [[
@@ -264,6 +329,7 @@ export async function sendCreateSuccessMessage(
     drawTime: Date | null
     drawCount: number | null
     requireChannels: string[]
+    channels?: Array<{ chatId: string; title: string; username?: string | null }>
     prizes: Array<{ name: string; total: number }>
   }, 
   creatorId: string
@@ -284,19 +350,18 @@ export async function sendCreateSuccessMessage(
 
   // 构建推送按钮
   const buttons = []
-  if (lottery.requireChannels && lottery.requireChannels.length > 0) {
-    for (let i = 0; i < lottery.requireChannels.length; i++) {
-      const targetChatId = lottery.requireChannels[i]
+  if (lottery.channels && lottery.channels.length > 0) {
+    for (const channel of lottery.channels) {
       buttons.push([{
-        text: `📢 推送到: 群组${i + 1}`,
-        callback_data: `publish_${lottery.id}_${targetChatId}`
+        text: `📢 发布到频道：${channel.title}`,
+        callback_data: `publish_${lottery.id}_${channel.chatId}`
       }])
     }
 
     // 添加推送全部按钮
-    if (lottery.requireChannels.length > 1) {
+    if (lottery.channels.length > 1) {
       buttons.push([{
-        text: '📢 推送到全部',
+        text: '📢 发布到全部频道',
         callback_data: `publish_all_${lottery.id}`
       }])
     }

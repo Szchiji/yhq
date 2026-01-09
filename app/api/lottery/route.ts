@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           prizes: true,
+          channels: true,
           _count: {
             select: {
               participants: true,
@@ -121,9 +122,18 @@ export async function POST(request: NextRequest) {
             remaining: prize.total,
           })),
         },
+        channels: {
+          create: (lottery.channels || []).map((channel: any) => ({
+            chatId: channel.chatId,
+            title: channel.title,
+            type: channel.type,
+            username: channel.username,
+          })),
+        },
       },
       include: {
         prizes: true,
+        channels: true,
       },
     })
 
