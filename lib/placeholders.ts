@@ -142,19 +142,19 @@ export function replaceAllPlaceholders(
 ): string {
   let result = template
   
-  if (data.lotterySn !== undefined) result = result.replace(/{lotterySn}/g, data.lotterySn)
-  if (data.lotteryTitle !== undefined) result = result.replace(/{lotteryTitle}/g, data.lotteryTitle)
+  if (data.lotterySn !== undefined) result = result.replace(/{lotterySn}/g, data.lotterySn || '')
+  if (data.lotteryTitle !== undefined) result = result.replace(/{lotteryTitle}/g, data.lotteryTitle || '')
   if (data.lotteryDesc !== undefined) result = result.replace(/{lotteryDesc}/g, data.lotteryDesc || '')
-  if (data.creator !== undefined) result = result.replace(/{creator}/g, data.creator)
-  if (data.joinCondition !== undefined) result = result.replace(/{joinCondition}/g, data.joinCondition)
-  if (data.goodsList !== undefined) result = result.replace(/{goodsList}/g, data.goodsList)
-  if (data.goodsName !== undefined) result = result.replace(/{goodsName}/g, data.goodsName)
-  if (data.openCondition !== undefined) result = result.replace(/{openCondition}/g, data.openCondition)
-  if (data.drawTime !== undefined) result = result.replace(/{drawTime}/g, data.drawTime)
+  if (data.creator !== undefined) result = result.replace(/{creator}/g, data.creator || '')
+  if (data.joinCondition !== undefined) result = result.replace(/{joinCondition}/g, data.joinCondition || '')
+  if (data.goodsList !== undefined) result = result.replace(/{goodsList}/g, data.goodsList || '')
+  if (data.goodsName !== undefined) result = result.replace(/{goodsName}/g, data.goodsName || '')
+  if (data.openCondition !== undefined) result = result.replace(/{openCondition}/g, data.openCondition || '')
+  if (data.drawTime !== undefined) result = result.replace(/{drawTime}/g, data.drawTime || '')
   if (data.joinNum !== undefined) result = result.replace(/{joinNum}/g, String(data.joinNum))
-  if (data.lotteryLink !== undefined) result = result.replace(/{lotteryLink}/g, data.lotteryLink)
-  if (data.member !== undefined) result = result.replace(/{member}/g, data.member)
-  if (data.awardUserList !== undefined) result = result.replace(/{awardUserList}/g, data.awardUserList)
+  if (data.lotteryLink !== undefined) result = result.replace(/{lotteryLink}/g, data.lotteryLink || '')
+  if (data.member !== undefined) result = result.replace(/{member}/g, data.member || '')
+  if (data.awardUserList !== undefined) result = result.replace(/{awardUserList}/g, data.awardUserList || '')
   
   return result
 }

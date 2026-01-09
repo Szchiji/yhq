@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/RichTextEditor'
 import { apiGet, apiPost } from '@/lib/api'
-import { TEMPLATE_PLACEHOLDERS } from '@/lib/placeholders'
+import { TEMPLATE_PLACEHOLDERS, getDefaultTemplate } from '@/lib/placeholders'
 
 const templateTypes = [
   { key: 'edit_success', name: '编辑成功模板' },
@@ -59,8 +59,6 @@ export default function TemplatesPage() {
   }
 
   const getDefaultContent = (type: string) => {
-    // Import getDefaultTemplate from placeholders
-    const { getDefaultTemplate } = require('@/lib/placeholders')
     return getDefaultTemplate(type)
   }
 
