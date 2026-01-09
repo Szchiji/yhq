@@ -14,13 +14,15 @@ export default function LayoutClient({
   
   // Close sidebar when route changes on mobile
   useEffect(() => {
-    if (window.innerWidth < 768) {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setSidebarOpen(false)
     }
   }, [pathname])
   
   // Set initial sidebar state based on screen size
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    
     const handleResize = () => {
       if (window.innerWidth >= 768) {
         setSidebarOpen(true)
