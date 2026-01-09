@@ -152,7 +152,7 @@ export default function AnnouncementsPage() {
         </button>
       </div>
 
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4" role="alert" aria-live="polite">
         <p className="text-xs sm:text-sm text-yellow-800">
           💡 在这里设置用于发布抽奖公告的群组或频道。抽奖创建成功后会自动推送到这些群组/频道。
         </p>

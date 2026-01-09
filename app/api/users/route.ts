@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { prisma, Prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
 
 // GET - 获取用户列表
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * perPage
 
     // Build where clause for search
-    const where: any = search ? {
+    const where: Prisma.UserWhereInput = search ? {
       OR: [
         { telegramId: { contains: search } },
         { username: { contains: search, mode: 'insensitive' } },

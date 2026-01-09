@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 自动推送到所有公告群/频道
-    let pushResults = []
+    let pushResults: Array<{ chatId: string; title: string; success: boolean; error?: string }> = []
     try {
       pushResults = await autoPushToAnnouncementChannels(createdLottery.id, user.id.toString())
     } catch (error) {

@@ -355,7 +355,9 @@ export async function sendCreateSuccessMessage(
 export async function autoPushToAnnouncementChannels(lotteryId: string, createdBy: string) {
   try {
     // Get all announcement channels
-    const channels = await prisma.announcementChannel.findMany()
+    const channels = await prisma.announcementChannel.findMany({
+      orderBy: { createdAt: 'desc' }
+    })
     
     if (channels.length === 0) {
       console.log('No announcement channels configured')

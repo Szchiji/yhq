@@ -4,11 +4,26 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiGet, apiPut } from '@/lib/api'
 
+type Lottery = {
+  id: string
+  title: string
+  description: string | null
+  status: string
+  drawType: string
+  drawTime: Date | null
+  drawCount: number | null
+  prizes: Array<{
+    id: string
+    name: string
+    total: number
+  }>
+}
+
 export default function EditLotteryPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [lottery, setLottery] = useState<any>(null)
+  const [lottery, setLottery] = useState<Lottery | null>(null)
   
   // Form states
   const [title, setTitle] = useState('')
