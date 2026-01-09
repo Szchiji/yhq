@@ -13,7 +13,14 @@ type Params = {
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const body = await request.json()
-    const { initData, chatId, force } = body
+    const { chatId, force } = body
+    
+    // Get initData from header
+    const initData = request.headers.get('x-telegram-init-data')
+    
+    if (!initData) {
+      return NextResponse.json({ error: 'Missing initData' }, { status: 400 })
+    }
 
     if (!chatId) {
       return NextResponse.json({ error: 'Missing chatId' }, { status: 400 })
