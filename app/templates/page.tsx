@@ -63,8 +63,8 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-800">抽奖消息模板</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">抽奖消息模板</h1>
 
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow">
@@ -73,7 +73,7 @@ export default function TemplatesPage() {
             <button
               key={index}
               onClick={() => setActiveTab(index)}
-              className={`px-6 py-3 font-medium whitespace-nowrap transition-colors ${
+              className={`px-3 sm:px-4 py-2 sm:py-3 font-medium whitespace-nowrap transition-colors text-xs sm:text-sm ${
                 activeTab === index
                   ? 'border-b-2 border-blue-500 text-blue-500'
                   : 'text-gray-600 hover:text-gray-800'
@@ -84,7 +84,7 @@ export default function TemplatesPage() {
           ))}
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
           {/* Rich Text Editor */}
           <RichTextEditor
             value={editorContent}
@@ -94,44 +94,44 @@ export default function TemplatesPage() {
           />
 
           {/* Button Configuration */}
-          <div className="space-y-4">
-            <h3 className="font-medium text-gray-800">附加按钮配置</h3>
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className="font-medium text-gray-800 text-sm sm:text-base">附加按钮配置</h3>
             
             {buttons.map((button, index) => (
-              <div key={index} className="flex gap-3 items-center">
+              <div key={index} className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
                 <input
                   type="text"
                   value={button.text}
                   onChange={(e) => updateButton(index, 'text', e.target.value)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   placeholder="按钮文字"
                 />
                 <input
                   type="text"
                   value={button.url}
                   onChange={(e) => updateButton(index, 'url', e.target.value)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   placeholder="按钮链接"
                 />
                 <button
                   onClick={() => deleteButton(index)}
-                  className="px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors text-sm self-start sm:self-auto"
                 >
                   删除
                 </button>
               </div>
             ))}
             
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               <button 
                 onClick={addButton}
-                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-3 py-1.5 sm:py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-xs sm:text-sm"
               >
                 + 添加新按钮
               </button>
               <button 
                 onClick={addRow}
-                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-3 py-1.5 sm:py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-xs sm:text-sm"
               >
                 + 添加新行
               </button>
@@ -140,13 +140,13 @@ export default function TemplatesPage() {
 
           {/* Button Preview */}
           {buttons.some(b => b.text) && (
-            <div className="space-y-4">
-              <h3 className="font-medium text-gray-800">按钮预览：</h3>
-              <div className="flex flex-wrap gap-3">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="font-medium text-gray-800 text-sm sm:text-base">按钮预览：</h3>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
                 {buttons.filter(b => b.text).map((button, index) => (
                   <button
                     key={index}
-                    className="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors text-xs sm:text-sm"
                   >
                     {button.text}
                   </button>
@@ -156,8 +156,8 @@ export default function TemplatesPage() {
           )}
 
           {/* Submit Button */}
-          <div className="flex justify-end pt-4 border-t border-gray-200">
-            <button className="px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors">
+          <div className="flex justify-end pt-3 sm:pt-4 border-t border-gray-200">
+            <button className="px-4 sm:px-6 py-2 sm:py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors text-sm">
               提交
             </button>
           </div>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTelegramWebApp } from '@/hooks/useTelegramWebApp'
 
 type MenuItem = {
@@ -36,10 +36,15 @@ const menuItems: MenuItem[] = [
   },
 ]
 
-export default function Sidebar() {
+type SidebarProps = {
+  isOpen: boolean
+  onClose: () => void
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['定时发送', '收费管理'])
-  const { user, isSuperAdmin, isAdmin } = useTelegramWebApp()
+  const { user, isSuperAdmin } = useTelegramWebApp()
 
   const toggleMenu = (menuName: string) => {
     setExpandedMenus((prev) =>
@@ -47,6 +52,13 @@ export default function Sidebar() {
         ? prev.filter((name) => name !== menuName)
         : [...prev, menuName]
     )
+  }
+
+  const handleLinkClick = () => {
+    // Close sidebar on mobile when a link is clicked
+    if (window.innerWidth < 768) {
+      onClose()
+    }
   }
 
   const renderMenuItem = (item: MenuItem, level = 0) => {
@@ -60,7 +72,7 @@ export default function Sidebar() {
         <div key={item.name}>
           <button
             onClick={() => toggleMenu(item.name)}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
               hasActiveChild
                 ? 'bg-blue-600 text-white'
                 : 'text-gray-200 hover:bg-blue-700'
@@ -68,7 +80,7 @@ export default function Sidebar() {
           >
             <span>{item.name}</span>
             <svg
-              className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -77,7 +89,7 @@ export default function Sidebar() {
             </svg>
           </button>
           {isExpanded && (
-            <div className="ml-4 mt-1 space-y-1">
+            <div className="ml-3 mt-1 space-y-1">
               {item.children.map((child) => renderMenuItem(child, level + 1))}
             </div>
           )}
@@ -91,8 +103,9 @@ export default function Sidebar() {
         <Link
           key={item.href}
           href={item.href}
-          className={`block px-4 py-3 rounded-lg transition-colors ${
-            level > 0 ? 'text-sm' : ''
+          onClick={handleLinkClick}
+          className={`block px-3 py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+            level > 0 ? 'text-xs' : ''
           } ${
             isActive
               ? 'bg-blue-500 text-white'
@@ -108,36 +121,57 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-blue-900 to-blue-800 shadow-lg overflow-y-auto flex flex-col">
-      <div className="p-6 border-b border-blue-700">
-        <h1 className="text-xl font-bold text-white">抽奖机器人</h1>
-      </div>
-      <nav className="p-4 space-y-2 flex-1">
-        {menuItems.map((item) => renderMenuItem(item))}
-      </nav>
-      
-      {/* User Info */}
-      {user && (
-        <div className="p-4 border-t border-blue-700">
-          <div className="bg-blue-700 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-white font-medium">
-                {user.first_name} {user.last_name || ''}
-              </span>
-              <span className={`text-xs px-2 py-1 rounded ${
-                isSuperAdmin
-                  ? 'bg-yellow-500 text-yellow-900' 
-                  : 'bg-blue-500 text-white'
-              }`}>
-                {isSuperAdmin ? '超级管理员' : '管理员'}
-              </span>
-            </div>
-            {user.username && (
-              <p className="text-blue-200 text-sm">@{user.username}</p>
-            )}
-          </div>
-        </div>
+    <>
+      {/* Overlay for mobile */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={onClose}
+        />
       )}
-    </aside>
+      
+      {/* Sidebar */}
+      <aside className={`fixed left-0 top-0 h-screen w-56 sm:w-60 bg-gradient-to-b from-blue-900 to-blue-800 shadow-lg overflow-y-auto flex flex-col z-50 transform transition-transform duration-300 ease-in-out ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      } md:translate-x-0`}>
+        <div className="p-3 sm:p-4 border-b border-blue-700 flex items-center justify-between">
+          <h1 className="text-sm sm:text-lg font-bold text-white">抽奖机器人</h1>
+          <button
+            onClick={onClose}
+            className="md:hidden p-1 text-white hover:bg-blue-700 rounded"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <nav className="p-2 sm:p-3 space-y-1 flex-1">
+          {menuItems.map((item) => renderMenuItem(item))}
+        </nav>
+        
+        {/* User Info */}
+        {user && (
+          <div className="p-2 sm:p-3 border-t border-blue-700">
+            <div className="bg-blue-700 rounded-lg p-2 sm:p-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-white font-medium text-xs sm:text-sm truncate max-w-[100px]">
+                  {user.first_name} {user.last_name || ''}
+                </span>
+                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                  isSuperAdmin
+                    ? 'bg-yellow-500 text-yellow-900' 
+                    : 'bg-blue-500 text-white'
+                }`}>
+                  {isSuperAdmin ? '超管' : '管理'}
+                </span>
+              </div>
+              {user.username && (
+                <p className="text-blue-200 text-xs truncate">@{user.username}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </aside>
+    </>
   )
 }

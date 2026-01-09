@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useRef } from 'react'
 
 type RichTextEditorProps = {
   value: string
@@ -27,7 +27,7 @@ export default function RichTextEditor({
   onChange,
   placeholder = '请输入内容...',
   placeholders = [],
-  minHeight = '300px',
+  minHeight = '200px',
   className = '',
 }: RichTextEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -61,15 +61,15 @@ export default function RichTextEditor({
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={`space-y-3 sm:space-y-4 ${className}`}>
       <div className="border border-gray-300 rounded-lg overflow-hidden">
         {/* Toolbar */}
-        <div className="bg-gray-50 border-b border-gray-300 p-2 flex gap-2 flex-wrap">
+        <div className="bg-gray-50 border-b border-gray-300 p-1.5 sm:p-2 flex gap-1 sm:gap-2 flex-wrap">
           {toolbarButtons.map((btn, idx) => (
             <button
               key={idx}
               onClick={() => insertFormat(btn.format)}
-              className="px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 transition-colors text-sm"
+              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 transition-colors text-xs sm:text-sm"
               title={btn.label}
               type="button"
             >
@@ -83,7 +83,7 @@ export default function RichTextEditor({
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full p-4 font-mono text-sm focus:outline-none"
+          className="w-full p-3 sm:p-4 font-mono text-xs sm:text-sm focus:outline-none"
           style={{ minHeight }}
           placeholder={placeholder}
         />
@@ -91,13 +91,13 @@ export default function RichTextEditor({
 
       {/* Placeholders Info */}
       {placeholders.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-medium text-blue-900 mb-2">可用变量：</h3>
-          <div className="flex flex-wrap gap-2">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+          <h3 className="font-medium text-blue-900 mb-2 text-xs sm:text-sm">可用变量：</h3>
+          <div className="flex flex-wrap gap-1 sm:gap-2">
             {placeholders.map((placeholder, idx) => (
               <span
                 key={idx}
-                className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md font-mono text-sm cursor-pointer hover:bg-blue-200 transition-colors"
+                className="px-2 sm:px-3 py-0.5 sm:py-1 bg-blue-100 text-blue-700 rounded-md font-mono text-xs cursor-pointer hover:bg-blue-200 transition-colors"
                 onClick={() => insertPlaceholder(placeholder)}
               >
                 {placeholder}
