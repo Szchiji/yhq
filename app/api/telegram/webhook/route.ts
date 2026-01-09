@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendMessage, isAdmin, isSuperAdmin } from '@/lib/telegram'
 
+// Get WebApp URL with fallback
+function getWebAppUrl(): string {
+  return process.env.WEBAPP_URL || process.env.VERCEL_URL || ''
+}
+
 // Telegram Bot webhook handler
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +33,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ ok: true })
         }
 
-        const webappUrl = process.env.WEBAPP_URL || 'https://your-domain.railway.app'
+        const webappUrl = getWebAppUrl()
         await sendMessage(chatId, '👋 欢迎使用抽奖机器人管理后台', {
           reply_markup: {
             inline_keyboard: [[
@@ -54,7 +59,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ ok: true })
         }
 
-        const webappUrl = process.env.WEBAPP_URL || 'https://your-domain.railway.app'
+        const webappUrl = getWebAppUrl()
         await sendMessage(chatId, '🎉 创建新的抽奖活动', {
           reply_markup: {
             inline_keyboard: [[
@@ -80,7 +85,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ ok: true })
         }
 
-        const webappUrl = process.env.WEBAPP_URL || 'https://your-domain.railway.app'
+        const webappUrl = getWebAppUrl()
         await sendMessage(chatId, '👥 创建邀请抽奖链接', {
           reply_markup: {
             inline_keyboard: [[
@@ -106,7 +111,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ ok: true })
         }
 
-        const webappUrl = process.env.WEBAPP_URL || 'https://your-domain.railway.app'
+        const webappUrl = getWebAppUrl()
         await sendMessage(chatId, '📋 查看我的抽奖列表', {
           reply_markup: {
             inline_keyboard: [[

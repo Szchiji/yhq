@@ -333,14 +333,3 @@ yhq/
 ## License
 
 This project is private and proprietary.
-## Security
-
-- All authentication is handled through Telegram's secure WebApp platform
-- InitData signature validation ensures requests come from Telegram
-- Super admin can only be set via environment variable
-- Admin management is restricted to super admin only
-- No passwords or sensitive data stored in the application
-
-## License
-
-This project is private and proprietary.

@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { prisma } from './prisma'
 
 // Telegram User type
 export interface TelegramUser {
@@ -70,7 +71,6 @@ export async function isAdmin(telegramId: string): Promise<boolean> {
   if (telegramId === superAdminId) return true
   
   // Query database for admin list
-  const { prisma } = await import('./prisma')
   const admin = await prisma.admin.findUnique({
     where: { telegramId }
   })

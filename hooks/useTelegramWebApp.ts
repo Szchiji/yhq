@@ -43,7 +43,12 @@ export function useTelegramWebApp() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initData }),
         })
-          .then(res => res.json())
+          .then(res => {
+            if (!res.ok) {
+              throw new Error(`Authentication failed with status ${res.status}`)
+            }
+            return res.json()
+          })
           .then(result => {
             if (result.error) {
               console.error('Authentication error:', result.error)
@@ -65,7 +70,7 @@ export function useTelegramWebApp() {
             }
           })
           .catch(err => {
-            console.error('Authentication failed:', err)
+            console.error('Network error during authentication:', err)
             setData({
               user: null,
               initData: '',

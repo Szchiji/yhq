@@ -2,9 +2,6 @@
   "name": "lottery-bot-management",
   "version": "0.1.0",
   "private": true,
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,6 +10,9 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
