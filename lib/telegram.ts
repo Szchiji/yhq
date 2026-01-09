@@ -175,8 +175,11 @@ export function replaceTemplateVariables(template: string, data: {
   joinNum?: number
 }): string {
   let result = template
-  Object.entries(data).forEach(([key, value]) => {
-    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value ?? ''))
-  })
+  // Pre-compile patterns for better performance
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined && value !== null) {
+      result = result.split(`{${key}}`).join(String(value))
+    }
+  }
   return result
 }

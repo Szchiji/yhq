@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { getTelegramInitData } from '@/lib/telegram-webapp'
 
 type Prize = {
   id: string
@@ -85,8 +86,7 @@ export default function LotteryDetailPage({ params }: { params: { id: string } }
 
     setDrawing(true)
     try {
-      // Get initData from Telegram WebApp
-      const initData = (window as any).Telegram?.WebApp?.initData || ''
+      const initData = getTelegramInitData()
       
       const response = await fetch(`/api/lottery/${params.id}/draw`, {
         method: 'POST',

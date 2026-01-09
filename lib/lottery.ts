@@ -22,12 +22,17 @@ export async function executeDraw(lotteryId: string) {
   }
 
   // 2. 随机抽取中奖者
+  // Create a Set of winner telegramIds for O(1) lookup
+  const winnerTelegramIds = new Set(lottery.winners.map(w => w.telegramId))
   const availableParticipants = lottery.participants.filter(
-    p => !lottery.winners.some(w => w.telegramId === p.telegramId)
+    p => !winnerTelegramIds.has(p.telegramId)
   )
 
   const winners = []
+  const prizeUpdates: Record<string, number> = {}
+  
   for (const prize of lottery.prizes) {
+    let winnersForPrize = 0
     for (let i = 0; i < prize.remaining && availableParticipants.length > 0; i++) {
       const randomIndex = Math.floor(Math.random() * availableParticipants.length)
       const winner = availableParticipants.splice(randomIndex, 1)[0]
@@ -40,7 +45,9 @@ export async function executeDraw(lotteryId: string) {
         prizeId: prize.id,
         prizeName: prize.name,
       })
+      winnersForPrize++
     }
+    prizeUpdates[prize.id] = Math.max(0, prize.remaining - winnersForPrize)
   }
 
   // 3. 更新数据库
@@ -56,7 +63,7 @@ export async function executeDraw(lotteryId: string) {
     ...lottery.prizes.map(p =>
       prisma.prize.update({
         where: { id: p.id },
-        data: { remaining: 0 },
+        data: { remaining: prizeUpdates[p.id] },
       })
     ),
   ])

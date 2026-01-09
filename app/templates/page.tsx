@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/RichTextEditor'
+import { getTelegramInitData } from '@/lib/telegram-webapp'
 
 const templateTypes = [
   { key: 'edit_success', name: '编辑成功模板' },
@@ -101,8 +102,7 @@ export default function TemplatesPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      // Get initData from Telegram WebApp
-      const initData = (window as any).Telegram?.WebApp?.initData || ''
+      const initData = getTelegramInitData()
       
       const currentType = templateTypes[activeTab].key
       const response = await fetch('/api/templates', {

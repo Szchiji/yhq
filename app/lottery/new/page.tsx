@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { getTelegramInitData } from '@/lib/telegram-webapp'
 
 type Prize = {
   id: number
@@ -96,8 +97,7 @@ export default function NewLotteryPage() {
 
     setLoading(true)
     try {
-      // Get initData from Telegram WebApp
-      const initData = (window as any).Telegram?.WebApp?.initData || ''
+      const initData = getTelegramInitData()
       
       const response = await fetch('/api/lottery', {
         method: 'POST',
