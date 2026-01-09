@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import type { UserProfile } from '@/types'
+import { useTelegramWebApp } from '@/hooks/useTelegramWebApp'
 
 type MenuItem = {
   name: string
@@ -38,25 +38,8 @@ const menuItems: MenuItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['定时发送', '收费管理'])
-  const [user, setUser] = useState<UserProfile | null>(null)
-  const [loggingOut, setLoggingOut] = useState(false)
-  const [logoutError, setLogoutError] = useState('')
-
-  useEffect(() => {
-    // Fetch current user
-    fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
-          setUser(data.user)
-        }
-      })
-      .catch(() => {
-        // Handle error silently
-      })
-  }, [])
+  const { user, isSuperAdmin, isAdmin } = useTelegramWebApp()
 
   const toggleMenu = (menuName: string) => {
     setExpandedMenus((prev) =>
@@ -65,30 +48,6 @@ export default function Sidebar() {
         : [...prev, menuName]
     )
   }
-
-  const handleLogout = async () => {
-    setLoggingOut(true)
-    setLogoutError('')
-    try {
-      const response = await fetch('/api/auth/logout', { method: 'POST' })
-      if (!response.ok) {
-        throw new Error('Logout failed')
-      }
-      router.push('/login')
-      router.refresh()
-    } catch (error) {
-      setLoggingOut(false)
-      setLogoutError('退出登录失败，请重试')
-    }
-  }
-
-  // Auto-clear logout error after 3 seconds
-  useEffect(() => {
-    if (logoutError) {
-      const timer = setTimeout(() => setLogoutError(''), 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [logoutError])
 
   const renderMenuItem = (item: MenuItem, level = 0) => {
     if (item.children) {
@@ -157,39 +116,26 @@ export default function Sidebar() {
         {menuItems.map((item) => renderMenuItem(item))}
       </nav>
       
-      {/* User Info and Logout */}
+      {/* User Info */}
       {user && (
         <div className="p-4 border-t border-blue-700">
-          <div className="bg-blue-700 rounded-lg p-4 mb-3">
+          <div className="bg-blue-700 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-white font-medium">{user.username}</span>
+              <span className="text-white font-medium">
+                {user.first_name} {user.last_name || ''}
+              </span>
               <span className={`text-xs px-2 py-1 rounded ${
-                user.role === 'SUPERADMIN' 
+                isSuperAdmin
                   ? 'bg-yellow-500 text-yellow-900' 
                   : 'bg-blue-500 text-white'
               }`}>
-                {user.role === 'SUPERADMIN' ? '超级管理员' : '管理员'}
+                {isSuperAdmin ? '超级管理员' : '管理员'}
               </span>
             </div>
-            {user.email && (
-              <p className="text-blue-200 text-sm truncate">{user.email}</p>
+            {user.username && (
+              <p className="text-blue-200 text-sm">@{user.username}</p>
             )}
           </div>
-          {logoutError && (
-            <div className="mb-3 p-2 bg-red-100 border border-red-400 text-red-700 text-sm rounded">
-              {logoutError}
-            </div>
-          )}
-          <button
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition-colors disabled:bg-red-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            {loggingOut ? '退出中...' : '退出登录'}
-          </button>
         </div>
       )}
     </aside>

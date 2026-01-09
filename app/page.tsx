@@ -1,4 +1,8 @@
+'use client'
+
 import Link from 'next/link'
+import { AuthGuard } from '@/components/AuthGuard'
+import { useTelegramWebApp } from '@/hooks/useTelegramWebApp'
 
 const quickActions = [
   {
@@ -31,11 +35,15 @@ const quickActions = [
   },
 ]
 
-export default function Home() {
+function HomeContent() {
+  const { user } = useTelegramWebApp()
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-800">欢迎使用抽奖机器人管理后台</h1>
+        <h1 className="text-3xl font-bold text-gray-800">
+          欢迎，{user?.first_name} {user?.last_name || ''}！
+        </h1>
         <p className="mt-2 text-gray-600">选择下方快捷操作或从左侧菜单开始</p>
       </div>
 
@@ -77,5 +85,13 @@ export default function Home() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <AuthGuard>
+      <HomeContent />
+    </AuthGuard>
   )
 }
