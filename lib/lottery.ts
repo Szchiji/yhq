@@ -61,10 +61,15 @@ export async function executeDraw(lotteryId: string) {
     ),
   ])
 
-  // 4. 发送通知
-  await sendNotifications(lottery, winners)
+  // Re-fetch winners with IDs
+  const createdWinners = await prisma.winner.findMany({
+    where: { lotteryId },
+  })
 
-  return winners
+  // 4. 发送通知
+  await sendNotifications(lottery, createdWinners)
+
+  return createdWinners
 }
 
 // 发送通知
