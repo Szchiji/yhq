@@ -81,3 +81,105 @@ export async function isAdmin(telegramId: string): Promise<boolean> {
 export function isSuperAdmin(telegramId: string): boolean {
   return telegramId === process.env.SUPER_ADMIN_ID
 }
+
+// 回应 callback_query
+export async function answerCallbackQuery(callbackQueryId: string, text?: string) {
+  const botToken = process.env.BOT_TOKEN
+  if (!botToken) {
+    throw new Error('BOT_TOKEN is not set')
+  }
+  await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      callback_query_id: callbackQueryId,
+      text,
+    }),
+  })
+}
+
+// 检查用户是否在频道/群组中
+export async function checkChatMember(chatId: string, userId: string): Promise<boolean> {
+  const botToken = process.env.BOT_TOKEN
+  if (!botToken) {
+    throw new Error('BOT_TOKEN is not set')
+  }
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/getChatMember`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        user_id: userId,
+      }),
+    })
+    const result = await response.json()
+    if (result.ok) {
+      const status = result.result.status
+      return ['member', 'administrator', 'creator'].includes(status)
+    }
+    return false
+  } catch (error) {
+    console.error('Error checking chat member:', error)
+    return false
+  }
+}
+
+// 发送抽奖消息到群组/频道
+export async function sendLotteryMessage(chatId: string | number, lottery: any) {
+  let message = `🎉 ${lottery.title}\n\n`
+  
+  if (lottery.description) {
+    message += `${lottery.description}\n\n`
+  }
+  
+  if (lottery.prizes && lottery.prizes.length > 0) {
+    message += '🎁 奖品列表：\n'
+    lottery.prizes.forEach((prize: any) => {
+      message += `  • ${prize.name} (${prize.remaining}/${prize.total})\n`
+    })
+    message += '\n'
+  }
+  
+  if (lottery.requireUsername) {
+    message += '⚠️ 参与需要设置用户名\n'
+  }
+  
+  if (lottery.requireChannels && lottery.requireChannels.length > 0) {
+    message += '⚠️ 参与需要加入指定频道/群组\n'
+  }
+  
+  const botUsername = process.env.BOT_USERNAME || 'lottery_bot'
+  const participateUrl = `https://t.me/${botUsername}?start=lottery_${lottery.id}`
+  
+  const chatIdNumber = typeof chatId === 'string' ? parseInt(chatId) : chatId
+  return sendMessage(chatIdNumber, message, {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '🎯 参与抽奖', url: participateUrl }
+      ]]
+    }
+  })
+}
+
+// 替换模板变量
+export function replaceTemplateVariables(template: string, data: {
+  member?: string
+  lotteryTitle?: string
+  goodsName?: string
+  creator?: string
+  creatorId?: string
+  creatorName?: string
+  lotterySn?: string
+  awardUserList?: string
+  joinNum?: number
+}): string {
+  let result = template
+  // Pre-compile patterns for better performance
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined && value !== null) {
+      result = result.split(`{${key}}`).join(String(value))
+    }
+  }
+  return result
+}
