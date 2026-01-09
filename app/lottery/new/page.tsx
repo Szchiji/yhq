@@ -10,10 +10,44 @@ type Prize = {
   total: number
 }
 
+type Channel = {
+  chatId: string
+  title: string
+  type: string
+  username?: string | null
+}
+
 const notificationPlaceholders = [
   '{member}', '{lotteryTitle}', '{goodsName}', '{creator}',
   '{creatorId}', '{creatorName}', '{lotterySn}', '{awardUserList}', '{joinNum}'
 ]
+
+const publishPlaceholders = [
+  { key: '{lotteryTitle}', desc: '抽奖标题' },
+  { key: '{lotteryDesc}', desc: '抽奖说明' },
+  { key: '{creator}', desc: '创建者' },
+  { key: '{channelList}', desc: '参与条件列表' },
+  { key: '{prizeList}', desc: '奖品列表' },
+  { key: '{drawTime}', desc: '开奖时间' },
+  { key: '{drawType}', desc: '开奖方式' },
+  { key: '{joinCount}', desc: '参与人数' },
+  { key: '{joinLink}', desc: '参与链接' },
+  { key: '{botUsername}', desc: '机器人用户名' },
+]
+
+const DEFAULT_PUBLISH_TEMPLATE = `🎁 抽奖标题：{lotteryTitle}
+
+📦 抽奖说明：
+{lotteryDesc}
+
+🎫 参与条件：
+{channelList}
+
+🎁 奖品内容：
+{prizeList}
+
+📅 开奖时间：{drawTime} {drawType}
+👉 参与抽奖链接：{joinLink}`
 
 export default function NewLotteryPage() {
   const router = useRouter()
@@ -28,8 +62,9 @@ export default function NewLotteryPage() {
   const [participationMethod, setParticipationMethod] = useState('private')
   const [keyword, setKeyword] = useState('')
   const [requireUsername, setRequireUsername] = useState(false)
-  const [requireChannels, setRequireChannels] = useState<string[]>([])
-  const [newChannel, setNewChannel] = useState('')
+  const [channels, setChannels] = useState<Channel[]>([])
+  const [channelInput, setChannelInput] = useState('')
+  const [addingChannel, setAddingChannel] = useState(false)
   const [drawType, setDrawType] = useState('count')
   const [drawTime, setDrawTime] = useState('')
   const [drawCount, setDrawCount] = useState(100)
@@ -43,6 +78,7 @@ export default function NewLotteryPage() {
   const [winnerNotification, setWinnerNotification] = useState('恭喜 {member}！您中奖了：{goodsName}')
   const [creatorNotification, setCreatorNotification] = useState('抽奖"{lotteryTitle}"已开奖，中奖用户已通知。')
   const [groupNotification] = useState('抽奖结果已公布！中奖名单：{awardUserList}')
+  const [publishTemplate, setPublishTemplate] = useState(DEFAULT_PUBLISH_TEMPLATE)
 
   const tabs = ['基础信息', '奖品设置', '通知设置']
 
@@ -62,15 +98,52 @@ export default function NewLotteryPage() {
     setPrizes(prizes.filter(p => p.id !== id))
   }
 
-  const addChannel = () => {
-    if (newChannel.trim() && !requireChannels.includes(newChannel.trim())) {
-      setRequireChannels([...requireChannels, newChannel.trim()])
-      setNewChannel('')
+  const handleAddChannel = async () => {
+    if (!channelInput.trim()) {
+      alert('请输入群组/频道 ID 或用户名')
+      return
+    }
+    
+    setAddingChannel(true)
+    try {
+      const response = await apiPost('/api/lottery/check-channel', {
+        chatId: channelInput.trim()
+      })
+      const data = await response.json()
+      
+      if (data.ok) {
+        // 检查是否已添加
+        if (channels.some(c => c.chatId === data.chat.id)) {
+          alert('该群组/频道已添加')
+          setAddingChannel(false)
+          return
+        }
+        
+        // 添加成功，保存群/频道信息
+        setChannels([...channels, {
+          chatId: data.chat.id,
+          title: data.chat.title,
+          type: data.chat.type,
+          username: data.chat.username
+        }])
+        setChannelInput('')
+      } else {
+        alert(data.error || '添加失败')
+      }
+    } catch (error) {
+      console.error('Error adding channel:', error)
+      alert('添加失败，请重试')
+    } finally {
+      setAddingChannel(false)
     }
   }
 
   const removeChannel = (index: number) => {
-    setRequireChannels(requireChannels.filter((_, i) => i !== index))
+    setChannels(channels.filter((_, i) => i !== index))
+  }
+
+  const resetToDefaultTemplate = () => {
+    setPublishTemplate(DEFAULT_PUBLISH_TEMPLATE)
   }
 
   const handleCreate = async () => {
@@ -106,13 +179,15 @@ export default function NewLotteryPage() {
           participationMethod,
           keyword: keyword || null,
           requireUsername,
-          requireChannels,
+          requireChannels: channels.map(c => c.chatId),
+          channels: channels,
           drawType,
           drawTime: drawType === 'time' ? drawTime : null,
           drawCount: drawType === 'count' ? drawCount : null,
           winnerNotification,
           creatorNotification,
           groupNotification,
+          publishTemplate,
           prizes: prizes.map(p => ({ name: p.name, total: p.total })),
         },
       })
@@ -288,33 +363,41 @@ export default function NewLotteryPage() {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      value={newChannel}
-                      onChange={(e) => setNewChannel(e.target.value)}
+                      value={channelInput}
+                      onChange={(e) => setChannelInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddChannel()}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       placeholder="例如：@channelname 或 -1001234567890"
+                      disabled={addingChannel}
                     />
                     <button
-                      onClick={addChannel}
-                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-xs sm:text-sm"
+                      onClick={handleAddChannel}
+                      disabled={addingChannel}
+                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
                     >
-                      添加
+                      {addingChannel ? '验证中...' : '添加'}
                     </button>
                   </div>
-                  {requireChannels.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {requireChannels.map((channel, idx) => (
-                        <span
+                  {channels.length > 0 && (
+                    <div className="space-y-2">
+                      {channels.map((channel, idx) => (
+                        <div
                           key={idx}
-                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded flex items-center gap-1 text-xs"
+                          className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded"
                         >
-                          {channel}
+                          <span className="text-xs sm:text-sm text-gray-800">
+                            {channel.title}
+                            {channel.username && (
+                              <span className="text-gray-400 ml-1">@{channel.username}</span>
+                            )}
+                          </span>
                           <button
                             onClick={() => removeChannel(idx)}
-                            className="text-red-500 hover:text-red-700"
+                            className="text-red-500 hover:text-red-700 text-xs sm:text-sm"
                           >
-                            ×
+                            删除
                           </button>
-                        </span>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -421,6 +504,35 @@ export default function NewLotteryPage() {
           {/* Tab 3: 通知设置 */}
           {activeTab === 2 && (
             <div className="space-y-4 sm:space-y-6">
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                  推送消息模板
+                </label>
+                <textarea
+                  value={publishTemplate}
+                  onChange={(e) => setPublishTemplate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[200px] font-mono text-xs sm:text-sm"
+                  placeholder="输入推送模板..."
+                />
+                <div className="mt-2 bg-blue-50 p-3 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800 mb-2">可用占位符：</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {publishPlaceholders.map((p, i) => (
+                      <div key={i} className="text-xs text-blue-600">
+                        <code className="bg-blue-100 px-1 rounded">{p.key}</code> - {p.desc}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetToDefaultTemplate}
+                  className="mt-2 text-sm text-blue-500 hover:underline"
+                >
+                  恢复默认模板
+                </button>
+              </div>
+
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   中奖私聊中奖人通知

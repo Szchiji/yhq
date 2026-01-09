@@ -15,6 +15,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       where: { id: params.id },
       include: {
         prizes: true,
+        channels: true,
         publishes: {
           orderBy: {
             publishedAt: 'desc'
