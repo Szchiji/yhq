@@ -72,22 +72,22 @@ export default function LotteryPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">抽奖设置</h1>
-        <button className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">抽奖设置</h1>
+        <button className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-xs sm:text-sm">
           已参与用户
         </button>
       </div>
 
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow">
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-200 overflow-x-auto">
           {tabs.map((tab, index) => (
             <button
               key={index}
               onClick={() => setActiveTab(index)}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-3 sm:px-6 py-2 sm:py-3 font-medium transition-colors text-xs sm:text-sm whitespace-nowrap ${
                 activeTab === index
                   ? 'border-b-2 border-blue-500 text-blue-500'
                   : 'text-gray-600 hover:text-gray-800'
@@ -98,31 +98,31 @@ export default function LotteryPage() {
           ))}
         </div>
 
-        <div className="p-6">
+        <div className="p-3 sm:p-4 md:p-6">
           {/* Tab 1: 基础信息 */}
           {activeTab === 0 && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   抽奖标题
                 </label>
                 <input
                   type="text"
                   value={lotteryTitle}
                   onChange={(e) => setLotteryTitle(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   placeholder="请输入抽奖标题"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   图片或视频
                 </label>
                 <select
                   value={mediaType}
                   onChange={(e) => setMediaType(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                   <option value="none">无</option>
                   <option value="image">图片</option>
@@ -131,23 +131,23 @@ export default function LotteryPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   抽奖文字说明
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] sm:min-h-[100px] text-sm"
                   placeholder="请输入抽奖说明"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   参与方式
                 </label>
                 <div className="space-y-2">
-                  <label className="flex items-center">
+                  <label className="flex items-center text-xs sm:text-sm">
                     <input
                       type="radio"
                       value="private"
@@ -157,7 +157,7 @@ export default function LotteryPage() {
                     />
                     <span className="text-gray-700">私聊机器人参与抽奖</span>
                   </label>
-                  <label className="flex items-center">
+                  <label className="flex items-center text-xs sm:text-sm">
                     <input
                       type="radio"
                       value="keyword"
@@ -171,10 +171,10 @@ export default function LotteryPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   参与条件
                 </label>
-                <label className="flex items-center">
+                <label className="flex items-center text-xs sm:text-sm">
                   <input
                     type="checkbox"
                     checked={requireUsername}
@@ -186,7 +186,7 @@ export default function LotteryPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   需要加入的群或频道
                 </label>
                 <div className="space-y-2">
@@ -195,12 +195,12 @@ export default function LotteryPage() {
                       type="text"
                       value={newGroup}
                       onChange={(e) => setNewGroup(e.target.value)}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       placeholder="输入群组名称或ID"
                     />
                     <button
                       onClick={addGroup}
-                      className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-xs sm:text-sm"
                     >
                       添加
                     </button>
@@ -210,7 +210,7 @@ export default function LotteryPage() {
                       {groups.map((group, idx) => (
                         <span
                           key={idx}
-                          className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md flex items-center gap-2"
+                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md flex items-center gap-1 text-xs sm:text-sm"
                         >
                           {group}
                           <button
@@ -227,11 +227,11 @@ export default function LotteryPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   开奖方式
                 </label>
                 <div className="space-y-2">
-                  <label className="flex items-center">
+                  <label className="flex items-center text-xs sm:text-sm">
                     <input
                       type="radio"
                       value="full"
@@ -241,7 +241,7 @@ export default function LotteryPage() {
                     />
                     <span className="text-gray-700">满人开奖</span>
                   </label>
-                  <label className="flex items-center">
+                  <label className="flex items-center text-xs sm:text-sm">
                     <input
                       type="radio"
                       value="timed"
@@ -258,42 +258,42 @@ export default function LotteryPage() {
 
           {/* Tab 2: 奖品设置 */}
           {activeTab === 1 && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-800">奖品列表</h3>
+                <h3 className="text-sm sm:text-lg font-medium text-gray-800">奖品列表</h3>
                 <button
                   onClick={() => setShowPrizeModal(true)}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors text-xs sm:text-sm"
                 >
                   + 添加奖品
                 </button>
               </div>
 
               {prizes.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">暂无奖品</p>
+                <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500 text-sm">暂无奖品</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-50 border-b">
-                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">奖品名称</th>
-                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">奖品总数</th>
-                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">剩余数量</th>
-                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">操作</th>
+                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700">奖品名称</th>
+                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700">总数</th>
+                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700">剩余</th>
+                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {prizes.map((prize) => (
                         <tr key={prize.id}>
-                          <td className="px-6 py-4 text-gray-800">{prize.name}</td>
-                          <td className="px-6 py-4 text-gray-600">{prize.total}</td>
-                          <td className="px-6 py-4 text-gray-600">{prize.remaining}</td>
-                          <td className="px-6 py-4">
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-800 text-xs sm:text-sm">{prize.name}</td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 text-xs sm:text-sm">{prize.total}</td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 text-xs sm:text-sm">{prize.remaining}</td>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4">
                             <button
                               onClick={() => deletePrize(prize.id)}
-                              className="text-red-500 hover:text-red-700 transition-colors"
+                              className="text-red-500 hover:text-red-700 transition-colors text-xs sm:text-sm"
                             >
                               删除
                             </button>
@@ -309,22 +309,22 @@ export default function LotteryPage() {
 
           {/* Tab 3: 通知设置 */}
           {activeTab === 2 && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   中奖私聊中奖人通知
                 </label>
                 <textarea
                   value={winnerNotification}
                   onChange={(e) => setWinnerNotification(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] font-mono text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[70px] sm:min-h-[80px] font-mono text-xs sm:text-sm"
                   placeholder="发送给中奖者的通知消息"
                 />
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-1 sm:gap-2">
                   {notificationPlaceholders.map((placeholder, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-mono cursor-pointer hover:bg-gray-200"
+                      className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-100 text-gray-700 rounded text-xs font-mono cursor-pointer hover:bg-gray-200"
                       onClick={() => setWinnerNotification(winnerNotification + ' ' + placeholder)}
                     >
                       {placeholder}
@@ -334,20 +334,20 @@ export default function LotteryPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   中奖私聊创建人通知
                 </label>
                 <textarea
                   value={creatorNotification}
                   onChange={(e) => setCreatorNotification(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] font-mono text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[70px] sm:min-h-[80px] font-mono text-xs sm:text-sm"
                   placeholder="发送给抽奖创建者的通知消息"
                 />
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-1 sm:gap-2">
                   {notificationPlaceholders.map((placeholder, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-mono cursor-pointer hover:bg-gray-200"
+                      className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-100 text-gray-700 rounded text-xs font-mono cursor-pointer hover:bg-gray-200"
                       onClick={() => setCreatorNotification(creatorNotification + ' ' + placeholder)}
                     >
                       {placeholder}
@@ -357,20 +357,20 @@ export default function LotteryPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   中奖发送到群/频道通知
                 </label>
                 <textarea
                   value={groupNotification}
                   onChange={(e) => setGroupNotification(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] font-mono text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[70px] sm:min-h-[80px] font-mono text-xs sm:text-sm"
                   placeholder="发送到群组/频道的中奖通知"
                 />
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-1 sm:gap-2">
                   {notificationPlaceholders.map((placeholder, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-mono cursor-pointer hover:bg-gray-200"
+                      className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-100 text-gray-700 rounded text-xs font-mono cursor-pointer hover:bg-gray-200"
                       onClick={() => setGroupNotification(groupNotification + ' ' + placeholder)}
                     >
                       {placeholder}
@@ -379,9 +379,9 @@ export default function LotteryPage() {
                 </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-900 mb-2">变量说明：</h4>
-                <ul className="text-sm text-blue-800 space-y-1">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                <h4 className="font-medium text-blue-900 mb-2 text-xs sm:text-sm">变量说明：</h4>
+                <ul className="text-xs sm:text-sm text-blue-800 space-y-1">
                   <li><code className="bg-blue-100 px-1 rounded">{'{member}'}</code> - 中奖用户</li>
                   <li><code className="bg-blue-100 px-1 rounded">{'{lotteryTitle}'}</code> - 抽奖标题</li>
                   <li><code className="bg-blue-100 px-1 rounded">{'{goodsName}'}</code> - 奖品名称</li>
@@ -397,8 +397,8 @@ export default function LotteryPage() {
           )}
 
           {/* Submit Button */}
-          <div className="flex justify-end pt-4 border-t border-gray-200 mt-6">
-            <button className="px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors">
+          <div className="flex justify-end pt-3 sm:pt-4 border-t border-gray-200 mt-4 sm:mt-6">
+            <button className="px-4 sm:px-6 py-2 sm:py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors text-sm">
               提交
             </button>
           </div>
@@ -407,24 +407,24 @@ export default function LotteryPage() {
 
       {/* Prize Modal */}
       {showPrizeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">添加奖品</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">添加奖品</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   奖品名称
                 </label>
                 <input
                   type="text"
                   value={newPrize.name}
                   onChange={(e) => setNewPrize({ ...newPrize, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   placeholder="请输入奖品名称"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   奖品数量
                 </label>
                 <input
@@ -435,20 +435,20 @@ export default function LotteryPage() {
                     const val = parseInt(e.target.value, 10)
                     setNewPrize({ ...newPrize, total: val > 0 ? val : 1 })
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowPrizeModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
               >
                 取消
               </button>
               <button
                 onClick={addPrize}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
               >
                 确认
               </button>

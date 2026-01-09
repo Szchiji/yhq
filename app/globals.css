@@ -8,6 +8,7 @@
   --background-end-rgb: 240, 240, 240;
 }
 
+/* Keep browser default 16px for accessibility, use Tailwind classes for smaller text */
 body {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
