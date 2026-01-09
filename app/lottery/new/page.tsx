@@ -109,6 +109,14 @@ export default function NewLotteryPage() {
       const response = await apiPost('/api/lottery/check-channel', {
         chatId: channelInput.trim()
       })
+      
+      if (!response.ok) {
+        const data = await response.json()
+        alert(data.error || '添加失败')
+        setAddingChannel(false)
+        return
+      }
+      
       const data = await response.json()
       
       if (data.ok) {
@@ -132,7 +140,7 @@ export default function NewLotteryPage() {
       }
     } catch (error) {
       console.error('Error adding channel:', error)
-      alert('添加失败，请重试')
+      alert('网络错误，请重试')
     } finally {
       setAddingChannel(false)
     }

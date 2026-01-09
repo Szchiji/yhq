@@ -24,6 +24,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       where: { id: params.id },
       include: {
         participants: true,
+        channels: true,
       },
     })
 
@@ -51,10 +52,14 @@ export async function POST(request: NextRequest, { params }: Params) {
       }, { status: 400 })
     }
 
-    // 检查参与条件：频道加入
-    if (lottery.requireChannels && lottery.requireChannels.length > 0) {
+    // 检查参与条件：频道加入（使用新的 channels 关联或旧的 requireChannels 数组）
+    const channelsToCheck = lottery.channels && lottery.channels.length > 0 
+      ? lottery.channels.map(c => c.chatId)
+      : (lottery.requireChannels && lottery.requireChannels.length > 0 ? lottery.requireChannels : [])
+    
+    if (channelsToCheck.length > 0) {
       const channelChecks = await Promise.all(
-        lottery.requireChannels.map(channelId => 
+        channelsToCheck.map(channelId => 
           checkChatMember(channelId, telegramId)
         )
       )
@@ -63,7 +68,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         return NextResponse.json({ 
           error: 'Channel membership required',
           message: '参与此抽奖需要加入指定的频道/群组',
-          requiredChannels: lottery.requireChannels
+          requiredChannels: lottery.channels && lottery.channels.length > 0 
+            ? lottery.channels.map(c => ({ id: c.chatId, title: c.title }))
+            : channelsToCheck
         }, { status: 400 })
       }
     }

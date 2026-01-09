@@ -42,7 +42,7 @@ model Lottery {
   
   // 参与条件
   requireUsername Boolean  @default(false)
-  requireChannels String[] // 需要加入的频道/群组 ID (保留兼容性)
+  requireChannels String[] // 向后兼容字段，新数据使用 channels 关联
   
   // 开奖设置
   drawType        String   // "time" | "count"

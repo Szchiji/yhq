@@ -205,14 +205,36 @@ const DEFAULT_PUBLISH_TEMPLATE = `🎁 抽奖标题：{lotteryTitle}
 📅 开奖时间：{drawTime} {drawType}
 👉 参与抽奖链接：{joinLink}`
 
+// 抽奖数据类型（用于构建消息）
+type LotteryWithRelations = {
+  id: string
+  title: string
+  description?: string | null
+  drawType: string
+  drawTime?: Date | null
+  drawCount?: number | null
+  creatorUsername?: string
+  channels?: Array<{ 
+    chatId: string
+    title: string 
+  }>
+  prizes?: Array<{ 
+    name: string
+    total: number 
+  }>
+  _count?: {
+    participants?: number
+  }
+}
+
 // 构建推送消息
-export function buildPublishMessage(lottery: any, botUsername: string): string {
+export function buildPublishMessage(lottery: LotteryWithRelations, botUsername: string): string {
   const channelList = lottery.channels && lottery.channels.length > 0
-    ? lottery.channels.map((c: any) => `🎫 加入-${c.title}`).join('\n')
+    ? lottery.channels.map((c) => `🎫 加入-${c.title}`).join('\n')
     : '无需加入频道/群组'
   
   const prizeList = lottery.prizes && lottery.prizes.length > 0
-    ? lottery.prizes.map((p: any) => `💰 ${p.name} × ${p.total}`).join('\n')
+    ? lottery.prizes.map((p) => `💰 ${p.name} × ${p.total}`).join('\n')
     : '暂无奖品'
   
   const drawTime = lottery.drawTime 
@@ -225,7 +247,7 @@ export function buildPublishMessage(lottery: any, botUsername: string): string {
   
   const joinLink = `https://t.me/${botUsername}?start=lottery_${lottery.id}`
   
-  let message = lottery.publishTemplate || DEFAULT_PUBLISH_TEMPLATE
+  let message = (lottery as any).publishTemplate || DEFAULT_PUBLISH_TEMPLATE
   
   message = message
     .replace(/{lotteryTitle}/g, lottery.title || '')
