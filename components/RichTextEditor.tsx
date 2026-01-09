@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useRef } from 'react'
+import { PLACEHOLDERS } from '@/lib/placeholders'
 
 type RichTextEditorProps = {
   value: string
@@ -60,6 +61,12 @@ export default function RichTextEditor({
     onChange(value + ' ' + placeholder)
   }
 
+  // Get placeholder info from PLACEHOLDERS
+  const getPlaceholderInfo = (key: string) => {
+    const placeholder = Object.values(PLACEHOLDERS).find(p => p.key === key)
+    return placeholder ? `${key} - ${placeholder.name}` : key
+  }
+
   return (
     <div className={`space-y-3 sm:space-y-4 ${className}`}>
       <div className="border border-gray-300 rounded-lg overflow-hidden">
@@ -92,16 +99,20 @@ export default function RichTextEditor({
       {/* Placeholders Info */}
       {placeholders.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-          <h3 className="font-medium text-blue-900 mb-2 text-xs sm:text-sm">可用变量：</h3>
-          <div className="flex flex-wrap gap-1 sm:gap-2">
+          <h3 className="font-medium text-blue-900 mb-2 text-xs sm:text-sm">可用占位符：</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {placeholders.map((placeholder, idx) => (
-              <span
+              <button
                 key={idx}
-                className="px-2 sm:px-3 py-0.5 sm:py-1 bg-blue-100 text-blue-700 rounded-md font-mono text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                type="button"
+                className="text-left px-2 sm:px-3 py-1.5 sm:py-2 bg-white border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
                 onClick={() => insertPlaceholder(placeholder)}
               >
-                {placeholder}
-              </span>
+                <div className="font-mono text-xs text-blue-700">{placeholder}</div>
+                <div className="text-xs text-gray-600 mt-0.5">
+                  {Object.values(PLACEHOLDERS).find(p => p.key === placeholder)?.name || ''}
+                </div>
+              </button>
             ))}
           </div>
         </div>
