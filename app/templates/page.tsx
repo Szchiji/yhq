@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/RichTextEditor'
-import { getTelegramInitData } from '@/lib/telegram-webapp'
+import { apiGet, apiPost } from '@/lib/api'
 
 const templateTypes = [
   { key: 'edit_success', name: '编辑成功模板' },
@@ -53,7 +53,7 @@ export default function TemplatesPage() {
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('/api/templates')
+      const response = await apiGet('/api/templates')
       if (response.ok) {
         const data = await response.json()
         const templatesMap: Record<string, any> = {}
@@ -102,20 +102,13 @@ export default function TemplatesPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const initData = getTelegramInitData()
-      
       const currentType = templateTypes[activeTab].key
-      const response = await fetch('/api/templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          initData,
-          template: {
-            type: currentType,
-            content: editorContent,
-            buttons: buttons.length > 0 ? buttons : null,
-          },
-        }),
+      const response = await apiPost('/api/templates', {
+        template: {
+          type: currentType,
+          content: editorContent,
+          buttons: buttons.length > 0 ? buttons : null,
+        },
       })
 
       if (response.ok) {

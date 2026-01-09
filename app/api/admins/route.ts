@@ -4,12 +4,11 @@ import { prisma } from '@/lib/prisma'
 
 // Verify request is from super admin
 async function verifySuperAdmin(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const initData = request.headers.get('x-telegram-init-data')
+  if (!initData) {
     return null
   }
 
-  const initData = authHeader.substring(7)
   const botToken = process.env.BOT_TOKEN
   if (!botToken) return null
 

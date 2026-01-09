@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { AuthGuard } from '@/components/AuthGuard'
-import { useTelegramWebApp } from '@/hooks/useTelegramWebApp'
 import DataTable from '@/components/DataTable'
+import { apiGet, apiPost, apiDelete } from '@/lib/api'
 
 type Admin = {
   id: string
@@ -16,7 +16,6 @@ type Admin = {
 }
 
 function AdminsContent() {
-  const { initData } = useTelegramWebApp()
   const [admins, setAdmins] = useState<Admin[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -31,17 +30,11 @@ function AdminsContent() {
 
   useEffect(() => {
     fetchAdmins()
-  }, [initData])
+  }, [])
 
   const fetchAdmins = async () => {
-    if (!initData) return
-
     try {
-      const response = await fetch('/api/admins', {
-        headers: {
-          Authorization: `Bearer ${initData}`,
-        },
-      })
+      const response = await apiGet('/api/admins')
 
       if (response.ok) {
         const data = await response.json()
@@ -60,20 +53,8 @@ function AdminsContent() {
       return
     }
 
-    if (!initData) {
-      setError('认证信息无效')
-      return
-    }
-
     try {
-      const response = await fetch('/api/admins', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${initData}`,
-        },
-        body: JSON.stringify(newAdmin),
-      })
+      const response = await apiPost('/api/admins', newAdmin)
 
       const data = await response.json()
 
@@ -94,18 +75,8 @@ function AdminsContent() {
   const deleteAdmin = async (adminId: string) => {
     if (!confirm('确定要删除这个管理员吗？')) return
 
-    if (!initData) {
-      setError('认证信息无效')
-      return
-    }
-
     try {
-      const response = await fetch(`/api/admins?id=${adminId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${initData}`,
-        },
-      })
+      const response = await apiDelete(`/api/admins?id=${adminId}`)
 
       if (!response.ok) {
         const data = await response.json()

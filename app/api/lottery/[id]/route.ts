@@ -44,7 +44,14 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const body = await request.json()
-    const { initData, lottery } = body
+    const { lottery } = body
+    
+    // Get initData from header
+    const initData = request.headers.get('x-telegram-init-data')
+    
+    if (!initData) {
+      return NextResponse.json({ error: 'Missing initData' }, { status: 400 })
+    }
 
     // 验证 Telegram WebApp 数据
     const botToken = process.env.BOT_TOKEN
@@ -113,8 +120,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
 // DELETE - 删除抽奖
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const initData = searchParams.get('initData')
+    // Get initData from header
+    const initData = request.headers.get('x-telegram-init-data')
 
     if (!initData) {
       return NextResponse.json({ error: 'Missing initData' }, { status: 400 })

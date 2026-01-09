@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getTelegramInitData } from '@/lib/telegram-webapp'
+import { apiGet, apiPost } from '@/lib/api'
 
 type Prize = {
   id: string
@@ -53,7 +53,7 @@ export default function LotteryDetailPage({ params }: { params: { id: string } }
 
   const fetchLottery = async () => {
     try {
-      const response = await fetch(`/api/lottery/${params.id}`)
+      const response = await apiGet(`/api/lottery/${params.id}`)
       if (response.ok) {
         const data = await response.json()
         setLottery(data)
@@ -69,7 +69,7 @@ export default function LotteryDetailPage({ params }: { params: { id: string } }
 
   const fetchParticipants = async () => {
     try {
-      const response = await fetch(`/api/lottery/${params.id}/participants?limit=100`)
+      const response = await apiGet(`/api/lottery/${params.id}/participants?limit=100`)
       if (response.ok) {
         const data = await response.json()
         setParticipants(data.data)
@@ -86,13 +86,7 @@ export default function LotteryDetailPage({ params }: { params: { id: string } }
 
     setDrawing(true)
     try {
-      const initData = getTelegramInitData()
-      
-      const response = await fetch(`/api/lottery/${params.id}/draw`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData }),
-      })
+      const response = await apiPost(`/api/lottery/${params.id}/draw`)
 
       if (response.ok) {
         const result = await response.json()

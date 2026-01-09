@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getTelegramInitData } from '@/lib/telegram-webapp'
+import { apiGet, apiDelete, apiPost } from '@/lib/api'
 
 type Lottery = {
   id: string
@@ -34,12 +34,13 @@ export default function LotteryPage() {
         params.append('status', statusFilter)
       }
       
-      const response = await fetch(`/api/lottery?${params.toString()}`)
+      const response = await apiGet(`/api/lottery?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
         setLotteries(data.data)
       } else {
-        console.error('Failed to fetch lotteries')
+        const error = await response.json()
+        console.error('Failed to fetch lotteries:', error)
       }
     } catch (error) {
       console.error('Error fetching lotteries:', error)
@@ -55,10 +56,7 @@ export default function LotteryPage() {
     }
     
     try {
-      const initData = getTelegramInitData()
-      const response = await fetch(`/api/lottery/${id}?initData=${encodeURIComponent(initData)}`, {
-        method: 'DELETE',
-      })
+      const response = await apiDelete(`/api/lottery/${id}`)
       
       if (response.ok) {
         alert('删除成功')
@@ -80,12 +78,7 @@ export default function LotteryPage() {
     }
     
     try {
-      const initData = getTelegramInitData()
-      const response = await fetch(`/api/lottery/${id}/draw`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData }),
-      })
+      const response = await apiPost(`/api/lottery/${id}/draw`)
       
       if (response.ok) {
         const data = await response.json()
