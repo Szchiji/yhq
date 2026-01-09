@@ -7,20 +7,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+model Admin {
   id          String   @id @default(cuid())
-  username    String   @unique
-  email       String?  @unique
-  password    String
-  role        Role     @default(ADMIN)
-  telegramId  String?  @unique
+  telegramId  String   @unique
+  username    String?
+  firstName   String?
+  lastName    String?
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  lastLoginAt DateTime?
+  createdBy   String   // Telegram ID of the super admin who added this admin
   isActive    Boolean  @default(true)
 }
 
-enum Role {
-  SUPERADMIN
-  ADMIN
+model User {
+  id          String   @id @default(cuid())
+  telegramId  String   @unique
+  username    String?
+  firstName   String?
+  lastName    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
