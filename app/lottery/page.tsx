@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { getTelegramInitData } from '@/lib/telegram-webapp'
 
 type Lottery = {
   id: string
@@ -45,6 +46,64 @@ export default function LotteryPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 删除确认
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`确定要删除抽奖「${title}」吗？此操作不可恢复。`)) {
+      return
+    }
+    
+    try {
+      const initData = getTelegramInitData()
+      const response = await fetch(`/api/lottery/${id}?initData=${encodeURIComponent(initData)}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        alert('删除成功')
+        fetchLotteries() // 刷新列表
+      } else {
+        const data = await response.json()
+        alert(`删除失败: ${data.error || '未知错误'}`)
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('删除失败，请重试')
+    }
+  }
+
+  // 手动开奖
+  const handleDraw = async (id: string) => {
+    if (!confirm('确定要立即开奖吗？开奖后无法撤销。')) {
+      return
+    }
+    
+    try {
+      const initData = getTelegramInitData()
+      const response = await fetch(`/api/lottery/${id}/draw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        alert(`开奖成功！共 ${data.winners?.length || 0} 人中奖`)
+        fetchLotteries() // 刷新列表
+      } else {
+        const data = await response.json()
+        alert(`开奖失败: ${data.error || '未知错误'}`)
+      }
+    } catch (error) {
+      console.error('Draw error:', error)
+      alert('开奖失败，请重试')
+    }
+  }
+
+  // 推送抽奖
+  const handlePublish = (id: string) => {
+    router.push(`/lottery/${id}?action=publish`)
   }
 
   const statusMap: Record<string, { text: string; color: string }> = {
@@ -152,12 +211,69 @@ export default function LotteryPage() {
                       {new Date(lottery.createdAt).toLocaleDateString('zh-CN')}
                     </td>
                     <td className="px-3 sm:px-6 py-4">
-                      <button
-                        onClick={() => router.push(`/lottery/${lottery.id}`)}
-                        className="text-blue-500 hover:text-blue-700 text-xs sm:text-sm"
-                      >
-                        查看详情
-                      </button>
+                      <div className="flex flex-wrap gap-1 sm:gap-2">
+                        {/* 查看详情 */}
+                        <button
+                          onClick={() => router.push(`/lottery/${lottery.id}`)}
+                          className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors"
+                          title="查看详情"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </button>
+                        
+                        {/* 编辑 - 仅进行中的抽奖 */}
+                        {lottery.status === 'active' && (
+                          <button
+                            onClick={() => router.push(`/lottery/${lottery.id}/edit`)}
+                            className="p-1.5 text-yellow-500 hover:bg-yellow-50 rounded transition-colors"
+                            title="编辑"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        )}
+                        
+                        {/* 推送 - 仅进行中的抽奖 */}
+                        {lottery.status === 'active' && (
+                          <button
+                            onClick={() => handlePublish(lottery.id)}
+                            className="p-1.5 text-green-500 hover:bg-green-50 rounded transition-colors"
+                            title="推送"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                            </svg>
+                          </button>
+                        )}
+                        
+                        {/* 手动开奖 - 仅进行中的抽奖 */}
+                        {lottery.status === 'active' && (
+                          <button
+                            onClick={() => handleDraw(lottery.id)}
+                            className="p-1.5 text-purple-500 hover:bg-purple-50 rounded transition-colors"
+                            title="手动开奖"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                        )}
+                        
+                        {/* 删除 */}
+                        <button
+                          onClick={() => handleDelete(lottery.id, lottery.title)}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                          title="删除"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
