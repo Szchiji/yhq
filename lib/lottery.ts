@@ -228,7 +228,7 @@ export async function publishLottery(lotteryId: string, chatId: string, publishe
     goodsList,
     joinCondition,
     openCondition,
-    joinNum: lottery.participants.length.toString()
+    joinNum: lottery.participants.length
   })
 
   // 发送消息
@@ -256,10 +256,21 @@ export async function publishLottery(lotteryId: string, chatId: string, publishe
 }
 
 // 发送创建成功消息
-export async function sendCreateSuccessMessage(lottery: any, creatorId: string) {
-  const goodsList = lottery.prizes.map((p: any) => `${p.name} x${p.total}`).join(', ')
+export async function sendCreateSuccessMessage(
+  lottery: { 
+    id: string
+    title: string
+    drawType: string
+    drawTime: Date | null
+    drawCount: number | null
+    requireChannels: string[]
+    prizes: Array<{ name: string; total: number }>
+  }, 
+  creatorId: string
+) {
+  const goodsList = lottery.prizes.map(p => `${p.name} x${p.total}`).join(', ')
   const openCondition = lottery.drawType === 'time' 
-    ? `定时开奖: ${new Date(lottery.drawTime).toLocaleString('zh-CN')}` 
+    ? `定时开奖: ${lottery.drawTime ? new Date(lottery.drawTime).toLocaleString('zh-CN') : ''}` 
     : `满 ${lottery.drawCount} 人开奖`
 
   const message = `✅ 抽奖创建成功！
@@ -275,10 +286,10 @@ export async function sendCreateSuccessMessage(lottery: any, creatorId: string) 
   const buttons = []
   if (lottery.requireChannels && lottery.requireChannels.length > 0) {
     for (let i = 0; i < lottery.requireChannels.length; i++) {
-      const chatId = lottery.requireChannels[i]
+      const targetChatId = lottery.requireChannels[i]
       buttons.push([{
         text: `📢 推送到: 群组${i + 1}`,
-        callback_data: `publish_${lottery.id}_${chatId}`
+        callback_data: `publish_${lottery.id}_${targetChatId}`
       }])
     }
 

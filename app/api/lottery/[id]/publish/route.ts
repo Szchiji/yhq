@@ -51,7 +51,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const existingPublish = await prisma.lotteryPublish.findFirst({
       where: {
         lotteryId: params.id,
-        chatId: chatId
+        chatId
       },
       orderBy: {
         publishedAt: 'desc'

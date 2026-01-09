@@ -240,7 +240,7 @@ export function replaceTemplateVariables(template: string, data: {
   creatorName?: string
   lotterySn?: string
   awardUserList?: string
-  joinNum?: number | string
+  joinNum?: number
   joinCondition?: string
   openCondition?: string
 }): string {
