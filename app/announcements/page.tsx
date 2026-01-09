@@ -152,12 +152,12 @@ export default function AnnouncementsPage() {
         </button>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-        <p className="text-xs sm:text-sm text-blue-800">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4">
+        <p className="text-xs sm:text-sm text-yellow-800">
           💡 在这里设置用于发布抽奖公告的群组或频道。抽奖创建成功后会自动推送到这些群组/频道。
         </p>
-        <p className="text-xs sm:text-sm text-blue-800 mt-2">
-          ⚠️ 注意：机器人必须是群组/频道的管理员才能添加成功。
+        <p className="text-xs sm:text-sm text-yellow-800 mt-2 font-medium">
+          ⚠️ 重要：机器人必须是群组/频道的管理员才能添加成功。
         </p>
       </div>
 

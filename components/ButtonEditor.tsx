@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { BUILTIN_BUTTON_ACTIONS } from '@/lib/button-actions'
 
 export type ButtonItem = {
   type: 'link' | 'builtin'
@@ -233,9 +234,11 @@ export default function ButtonEditor({ buttons, onChange }: ButtonEditorProps) {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value="">请选择...</option>
-                    <option value="join_lottery">参与抽奖</option>
-                    <option value="view_details">查看详情</option>
-                    <option value="share">分享</option>
+                    {BUILTIN_BUTTON_ACTIONS.map((action) => (
+                      <option key={action.value} value={action.value}>
+                        {action.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               )}

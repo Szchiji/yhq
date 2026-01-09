@@ -359,7 +359,7 @@ export async function autoPushToAnnouncementChannels(lotteryId: string, createdB
     
     if (channels.length === 0) {
       console.log('No announcement channels configured')
-      return
+      return []
     }
 
     // Push to each channel
@@ -367,12 +367,26 @@ export async function autoPushToAnnouncementChannels(lotteryId: string, createdB
     for (const channel of channels) {
       try {
         await publishLottery(lotteryId, channel.chatId, createdBy)
-        results.push({ chatId: channel.chatId, success: true })
+        results.push({ 
+          chatId: channel.chatId, 
+          title: channel.title,
+          success: true 
+        })
       } catch (error) {
         console.error(`Failed to push to channel ${channel.chatId}:`, error)
-        results.push({ chatId: channel.chatId, success: false, error: String(error) })
+        results.push({ 
+          chatId: channel.chatId, 
+          title: channel.title,
+          success: false, 
+          error: String(error) 
+        })
       }
     }
+
+    // Log summary
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.filter(r => !r.success).length
+    console.log(`Auto-push complete: ${successCount} succeeded, ${failCount} failed`)
 
     return results
   } catch (error) {

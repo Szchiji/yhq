@@ -146,14 +146,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 自动推送到所有公告群/频道
+    let pushResults = []
     try {
-      await autoPushToAnnouncementChannels(createdLottery.id, user.id.toString())
+      pushResults = await autoPushToAnnouncementChannels(createdLottery.id, user.id.toString())
     } catch (error) {
       console.error('Failed to auto-push to announcement channels:', error)
       // Don't fail the request if auto-push fails
     }
 
-    return NextResponse.json(createdLottery, { status: 201 })
+    return NextResponse.json({
+      lottery: createdLottery,
+      pushResults,
+    }, { status: 201 })
   } catch (error) {
     console.error('Error creating lottery:', error)
     return NextResponse.json({ error: 'Failed to create lottery' }, { status: 500 })

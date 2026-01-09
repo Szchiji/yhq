@@ -61,12 +61,6 @@ export default function RichTextEditor({
     onChange(value + ' ' + placeholder)
   }
 
-  // Get placeholder info from PLACEHOLDERS
-  const getPlaceholderInfo = (key: string) => {
-    const placeholder = Object.values(PLACEHOLDERS).find(p => p.key === key)
-    return placeholder ? `${key} - ${placeholder.name}` : key
-  }
-
   return (
     <div className={`space-y-3 sm:space-y-4 ${className}`}>
       <div className="border border-gray-300 rounded-lg overflow-hidden">
