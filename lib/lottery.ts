@@ -342,36 +342,41 @@ export async function sendCreateSuccessMessage(
 👥 开奖：${openCondition}
 📅 创建：${new Date().toLocaleString('zh-CN')}
 
-请选择推送到哪个群组/频道：`
-
-  // 构建推送按钮
-  const buttons = []
-  if (lottery.channels && lottery.channels.length > 0) {
-    for (const channel of lottery.channels) {
-      // Use title if available, otherwise use chatId as fallback
-      const channelName = channel.title || channel.chatId
-      buttons.push([{
-        text: `📢 发布到频道：${channelName}`,
-        callback_data: `publish_${lottery.id}_${channel.chatId}`
-      }])
-    }
-
-    // 添加推送全部按钮
-    if (lottery.channels.length > 1) {
-      buttons.push([{
-        text: '📢 发布到全部频道',
-        callback_data: `publish_all_${lottery.id}`
-      }])
-    }
-  }
+抽奖已自动推送到所有公告群/频道。`
 
   try {
-    await sendMessage(parseInt(creatorId), message, {
-      reply_markup: {
-        inline_keyboard: buttons
-      }
-    })
+    await sendMessage(parseInt(creatorId), message)
   } catch (error) {
     console.error('Failed to send create success message:', error)
+  }
+}
+
+// 自动推送到所有公告群/频道
+export async function autoPushToAnnouncementChannels(lotteryId: string, createdBy: string) {
+  try {
+    // Get all announcement channels
+    const channels = await prisma.announcementChannel.findMany()
+    
+    if (channels.length === 0) {
+      console.log('No announcement channels configured')
+      return
+    }
+
+    // Push to each channel
+    const results = []
+    for (const channel of channels) {
+      try {
+        await publishLottery(lotteryId, channel.chatId, createdBy)
+        results.push({ chatId: channel.chatId, success: true })
+      } catch (error) {
+        console.error(`Failed to push to channel ${channel.chatId}:`, error)
+        results.push({ chatId: channel.chatId, success: false, error: String(error) })
+      }
+    }
+
+    return results
+  } catch (error) {
+    console.error('Error auto-pushing to announcement channels:', error)
+    return []
   }
 }
