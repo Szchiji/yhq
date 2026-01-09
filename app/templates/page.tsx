@@ -145,7 +145,7 @@ export default function TemplatesPage() {
             value={editorContent}
             onChange={setEditorContent}
             placeholder="请输入消息模板..."
-            placeholders={TEMPLATE_PLACEHOLDERS[templateTypes[activeTab].key] || []}
+            placeholders={TEMPLATE_PLACEHOLDERS[templateTypes[activeTab].key as keyof typeof TEMPLATE_PLACEHOLDERS] || []}
           />
 
           {/* Button Configuration */}
