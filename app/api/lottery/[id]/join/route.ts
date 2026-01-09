@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { checkChatMember } from '@/lib/telegram'
+import { checkAndDraw } from '@/lib/lottery'
+
+type Params = {
+  params: {
+    id: string
+  }
+}
+
+// POST - 用户参与抽奖
+export async function POST(request: NextRequest, { params }: Params) {
+  try {
+    const body = await request.json()
+    const { telegramId, username, firstName, lastName, invitedBy } = body
+
+    if (!telegramId) {
+      return NextResponse.json({ error: 'Missing telegramId' }, { status: 400 })
+    }
+
+    // 获取抽奖信息
+    const lottery = await prisma.lottery.findUnique({
+      where: { id: params.id },
+      include: {
+        participants: true,
+      },
+    })
+
+    if (!lottery) {
+      return NextResponse.json({ error: 'Lottery not found' }, { status: 404 })
+    }
+
+    if (lottery.status !== 'active') {
+      return NextResponse.json({ error: 'Lottery is not active' }, { status: 400 })
+    }
+
+    // 检查是否已参与
+    const existingParticipant = lottery.participants.find(
+      p => p.telegramId === telegramId
+    )
+    if (existingParticipant) {
+      return NextResponse.json({ error: 'Already participated' }, { status: 400 })
+    }
+
+    // 检查参与条件：用户名
+    if (lottery.requireUsername && !username) {
+      return NextResponse.json({ 
+        error: 'Username required',
+        message: '参与此抽奖需要设置 Telegram 用户名'
+      }, { status: 400 })
+    }
+
+    // 检查参与条件：频道加入
+    if (lottery.requireChannels && lottery.requireChannels.length > 0) {
+      const channelChecks = await Promise.all(
+        lottery.requireChannels.map(channelId => 
+          checkChatMember(channelId, telegramId)
+        )
+      )
+      
+      if (channelChecks.some(result => !result)) {
+        return NextResponse.json({ 
+          error: 'Channel membership required',
+          message: '参与此抽奖需要加入指定的频道/群组',
+          requiredChannels: lottery.requireChannels
+        }, { status: 400 })
+      }
+    }
+
+    // 创建参与记录
+    const participant = await prisma.participant.create({
+      data: {
+        lotteryId: params.id,
+        telegramId,
+        username,
+        firstName,
+        lastName,
+        invitedBy,
+      },
+    })
+
+    // 如果有邀请者，更新邀请者的邀请数量
+    if (invitedBy) {
+      await prisma.participant.updateMany({
+        where: {
+          lotteryId: params.id,
+          telegramId: invitedBy,
+        },
+        data: {
+          inviteCount: {
+            increment: 1,
+          },
+        },
+      })
+    }
+
+    // 检查是否触发人满开奖
+    await checkAndDraw(params.id)
+
+    return NextResponse.json({ 
+      success: true,
+      participant,
+      message: '参与成功！'
+    }, { status: 201 })
+  } catch (error) {
+    console.error('Error joining lottery:', error)
+    return NextResponse.json({ error: 'Failed to join lottery' }, { status: 500 })
+  }
+}
