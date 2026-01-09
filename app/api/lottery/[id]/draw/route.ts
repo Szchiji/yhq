@@ -12,8 +12,12 @@ type Params = {
 // POST - 手动开奖
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const body = await request.json()
-    const { initData } = body
+    // Get initData from header
+    const initData = request.headers.get('x-telegram-init-data')
+    
+    if (!initData) {
+      return NextResponse.json({ error: 'Missing initData' }, { status: 400 })
+    }
 
     // 验证 Telegram WebApp 数据
     const botToken = process.env.BOT_TOKEN

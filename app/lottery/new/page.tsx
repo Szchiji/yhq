@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getTelegramInitData } from '@/lib/telegram-webapp'
+import { apiPost } from '@/lib/api'
 
 type Prize = {
   id: number
@@ -97,31 +97,24 @@ export default function NewLotteryPage() {
 
     setLoading(true)
     try {
-      const initData = getTelegramInitData()
-      
-      const response = await fetch('/api/lottery', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          initData,
-          lottery: {
-            title: lotteryTitle,
-            description,
-            mediaType,
-            mediaUrl: mediaUrl || null,
-            participationMethod,
-            keyword: keyword || null,
-            requireUsername,
-            requireChannels,
-            drawType,
-            drawTime: drawType === 'time' ? drawTime : null,
-            drawCount: drawType === 'count' ? drawCount : null,
-            winnerNotification,
-            creatorNotification,
-            groupNotification,
-            prizes: prizes.map(p => ({ name: p.name, total: p.total })),
-          },
-        }),
+      const response = await apiPost('/api/lottery', {
+        lottery: {
+          title: lotteryTitle,
+          description,
+          mediaType,
+          mediaUrl: mediaUrl || null,
+          participationMethod,
+          keyword: keyword || null,
+          requireUsername,
+          requireChannels,
+          drawType,
+          drawTime: drawType === 'time' ? drawTime : null,
+          drawCount: drawType === 'count' ? drawCount : null,
+          winnerNotification,
+          creatorNotification,
+          groupNotification,
+          prizes: prizes.map(p => ({ name: p.name, total: p.total })),
+        },
       })
 
       if (response.ok) {
