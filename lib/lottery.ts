@@ -348,8 +348,10 @@ export async function sendCreateSuccessMessage(
   const buttons = []
   if (lottery.channels && lottery.channels.length > 0) {
     for (const channel of lottery.channels) {
+      // Use title if available, otherwise use chatId as fallback
+      const channelName = channel.title || channel.chatId
       buttons.push([{
-        text: `📢 发布到频道：${channel.title}`,
+        text: `📢 发布到频道：${channelName}`,
         callback_data: `publish_${lottery.id}_${channel.chatId}`
       }])
     }
