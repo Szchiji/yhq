@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
-import { sendMessage, replaceTemplateVariables, getBotUsername, getChat } from './telegram'
+import { sendMessage, getBotUsername, getChat, getTemplate } from './telegram'
+import { replaceAllPlaceholders } from './placeholders'
 
 // 执行开奖
 export async function executeDraw(lotteryId: string) {
@@ -81,18 +82,23 @@ export async function executeDraw(lotteryId: string) {
 
 // 发送通知
 async function sendNotifications(lottery: any, winners: any[]) {
+  // 获取模板
+  const winnerPrivateTemplate = await getTemplate('winner_private', lottery.createdBy)
+  const creatorPrivateTemplate = await getTemplate('creator_private', lottery.createdBy)
+  const winnerPublicTemplate = await getTemplate('winner_public', lottery.createdBy)
+  
   // 中奖用户列表文本
-  const winnerListText = winners
+  const awardUserList = winners
     .map(w => `${w.firstName || w.username || w.telegramId} - ${w.prizeName}`)
     .join('\n')
 
   // 通知中奖者
   for (const winner of winners) {
-    const message = replaceTemplateVariables(lottery.winnerNotification, {
-      member: winner.firstName || winner.username || winner.telegramId,
-      lotteryTitle: lottery.title,
-      goodsName: winner.prizeName,
+    const message = replaceAllPlaceholders(winnerPrivateTemplate, {
       lotterySn: lottery.id.slice(0, 8),
+      lotteryTitle: lottery.title,
+      member: winner.firstName || winner.username || winner.telegramId,
+      goodsName: winner.prizeName,
     })
 
     try {
@@ -107,10 +113,11 @@ async function sendNotifications(lottery: any, winners: any[]) {
   }
 
   // 通知创建者
-  const creatorMessage = replaceTemplateVariables(lottery.creatorNotification, {
+  const creatorMessage = replaceAllPlaceholders(creatorPrivateTemplate, {
+    lotterySn: lottery.id.slice(0, 8),
     lotteryTitle: lottery.title,
-    awardUserList: winnerListText,
-    joinNum: lottery.participants.length,
+    awardUserList,
+    joinNum: lottery.participants?.length || 0,
   })
 
   try {
@@ -120,10 +127,11 @@ async function sendNotifications(lottery: any, winners: any[]) {
   }
 
   // 通知群组（更新已推送的消息或发送新消息）
-  const groupMessage = replaceTemplateVariables(lottery.groupNotification, {
+  const groupMessage = replaceAllPlaceholders(winnerPublicTemplate, {
+    lotterySn: lottery.id.slice(0, 8),
     lotteryTitle: lottery.title,
-    awardUserList: winnerListText,
-    joinNum: lottery.participants.length,
+    awardUserList,
+    joinNum: lottery.participants?.length || 0,
   })
 
   const publishes = await prisma.lotteryPublish.findMany({
@@ -190,21 +198,6 @@ export async function checkScheduledDraws() {
   return results
 }
 
-// 默认推送模板
-const DEFAULT_PUBLISH_TEMPLATE = `🎁 抽奖标题：{lotteryTitle}
-
-📦 抽奖说明：
-{lotteryDesc}
-
-🎫 参与条件：
-{channelList}
-
-🎁 奖品内容：
-{prizeList}
-
-📅 开奖时间：{drawTime} {drawType}
-👉 参与抽奖链接：{joinLink}`
-
 // 抽奖数据类型（用于构建消息）
 type LotteryWithRelations = {
   id: string
@@ -213,6 +206,7 @@ type LotteryWithRelations = {
   drawType: string
   drawTime?: Date | null
   drawCount?: number | null
+  createdBy: string
   creatorUsername?: string
   channels?: Array<{ 
     chatId: string
@@ -228,40 +222,42 @@ type LotteryWithRelations = {
 }
 
 // 构建推送消息
-export function buildPublishMessage(lottery: LotteryWithRelations, botUsername: string): string {
-  const channelList = lottery.channels && lottery.channels.length > 0
+export async function buildPublishMessage(lottery: LotteryWithRelations, botUsername: string): Promise<string> {
+  // 从数据库获取用户自定义模板
+  const template = await getTemplate('edit_success', lottery.createdBy)
+  
+  // 构建参与条件文本
+  const joinCondition = lottery.channels && lottery.channels.length > 0
     ? lottery.channels.map((c) => `🎫 加入-${c.title}`).join('\n')
     : '无需加入频道/群组'
   
-  const prizeList = lottery.prizes && lottery.prizes.length > 0
+  // 构建奖品列表
+  const goodsList = lottery.prizes && lottery.prizes.length > 0
     ? lottery.prizes.map((p) => `💰 ${p.name} × ${p.total}`).join('\n')
     : '暂无奖品'
   
+  // 构建开奖条件
   const drawTime = lottery.drawTime 
     ? new Date(lottery.drawTime).toLocaleString('zh-CN')
     : ''
+  const openCondition = lottery.drawType === 'time' 
+    ? `${drawTime} 自动开奖` 
+    : `满 ${lottery.drawCount} 人开奖`
   
-  const drawType = lottery.drawType === 'time' 
-    ? '自动开奖' 
-    : `满${lottery.drawCount}人开奖`
+  const lotteryLink = `https://t.me/${botUsername}?start=lottery_${lottery.id}`
   
-  const joinLink = `https://t.me/${botUsername}?start=lottery_${lottery.id}`
-  
-  let message = (lottery as any).publishTemplate || DEFAULT_PUBLISH_TEMPLATE
-  
-  message = message
-    .replace(/{lotteryTitle}/g, lottery.title || '')
-    .replace(/{lotteryDesc}/g, lottery.description || '')
-    .replace(/{creator}/g, lottery.creatorUsername ? `@${lottery.creatorUsername}` : '')
-    .replace(/{channelList}/g, channelList)
-    .replace(/{prizeList}/g, prizeList)
-    .replace(/{drawTime}/g, drawTime)
-    .replace(/{drawType}/g, drawType)
-    .replace(/{joinCount}/g, String(lottery._count?.participants || 0))
-    .replace(/{joinLink}/g, joinLink)
-    .replace(/{botUsername}/g, botUsername)
-  
-  return message
+  return replaceAllPlaceholders(template, {
+    lotterySn: lottery.id.slice(0, 8),
+    lotteryTitle: lottery.title,
+    lotteryDesc: lottery.description || '',
+    creator: lottery.creatorUsername ? `@${lottery.creatorUsername}` : '',
+    joinCondition,
+    goodsList,
+    openCondition,
+    drawTime,
+    joinNum: lottery._count?.participants || 0,
+    lotteryLink,
+  })
 }
 
 // 推送抽奖消息
@@ -295,7 +291,7 @@ export async function publishLottery(lotteryId: string, chatId: string, publishe
 
   // 构建消息内容
   const botUsername = await getBotUsername()
-  const message = buildPublishMessage(lottery, botUsername)
+  const message = await buildPublishMessage(lottery, botUsername)
 
   // 发送消息
   const result = await sendMessage(chatId, message, {

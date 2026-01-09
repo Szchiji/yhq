@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/RichTextEditor'
 import { apiGet, apiPost } from '@/lib/api'
+import { TEMPLATE_PLACEHOLDERS } from '@/lib/placeholders'
 
 const templateTypes = [
   { key: 'edit_success', name: '编辑成功模板' },
@@ -11,18 +12,6 @@ const templateTypes = [
   { key: 'winner_private', name: '中奖私聊用户模板' },
   { key: 'creator_private', name: '中奖私聊创建人模板' },
   { key: 'winner_public', name: '中奖公开通知模板' },
-]
-
-const placeholders = [
-  '{lotterySn}',
-  '{lotteryTitle}',
-  '{lotteryDesc}',
-  '{joinCondition}',
-  '{openCondition}',
-  '{goodsList}',
-  '{lotteryLink}',
-  '{member}',
-  '{goodsName}',
 ]
 
 export default function TemplatesPage() {
@@ -70,15 +59,9 @@ export default function TemplatesPage() {
   }
 
   const getDefaultContent = (type: string) => {
-    const defaults: Record<string, string> = {
-      edit_success: '抽奖已成功编辑！',
-      user_join_prompt: '点击下方按钮参与抽奖：{lotteryTitle}',
-      user_join_success: '恭喜！您已成功参与抽奖：{lotteryTitle}',
-      winner_private: '恭喜 {member}！您中奖了：{goodsName}',
-      creator_private: '抽奖"{lotteryTitle}"已开奖，中奖用户已通知。',
-      winner_public: '抽奖结果已公布！中奖名单：{awardUserList}',
-    }
-    return defaults[type] || ''
+    // Import getDefaultTemplate from placeholders
+    const { getDefaultTemplate } = require('@/lib/placeholders')
+    return getDefaultTemplate(type)
   }
 
   const addButton = () => {
@@ -162,7 +145,7 @@ export default function TemplatesPage() {
             value={editorContent}
             onChange={setEditorContent}
             placeholder="请输入消息模板..."
-            placeholders={placeholders}
+            placeholders={TEMPLATE_PLACEHOLDERS[templateTypes[activeTab].key] || []}
           />
 
           {/* Button Configuration */}

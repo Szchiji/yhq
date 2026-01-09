@@ -47,7 +47,30 @@ export async function POST(request: NextRequest) {
           
           if (joinResponse.ok) {
             await answerCallbackQuery(callbackQuery.id, '参与成功！')
-            await sendMessage(chatId, result.message || '✅ 您已成功参与抽奖！')
+            
+            // Use template for success message
+            const { getTemplate } = await import('@/lib/telegram')
+            const { replaceAllPlaceholders } = await import('@/lib/placeholders')
+            
+            const lottery = await prisma.lottery.findUnique({
+              where: { id: lotteryId },
+              include: { 
+                _count: { select: { participants: true } } 
+              }
+            })
+            
+            if (lottery) {
+              const template = await getTemplate('user_join_success', lottery.createdBy)
+              const message = replaceAllPlaceholders(template, {
+                lotterySn: lottery.id.slice(0, 8),
+                lotteryTitle: lottery.title,
+                member: firstName || username || userId,
+                joinNum: lottery._count.participants,
+              })
+              await sendMessage(chatId, message)
+            } else {
+              await sendMessage(chatId, result.message || '✅ 您已成功参与抽奖！')
+            }
           } else {
             await answerCallbackQuery(callbackQuery.id, result.message || '参与失败')
             if (result.error === 'Already participated') {
@@ -196,9 +219,17 @@ export async function POST(request: NextRequest) {
           
           try {
             const { prisma } = await import('@/lib/prisma')
+            const { getTemplate } = await import('@/lib/telegram')
+            const { replaceAllPlaceholders } = await import('@/lib/placeholders')
+            const { getBotUsername } = await import('@/lib/telegram')
+            
             const lottery = await prisma.lottery.findUnique({
               where: { id: lotteryId },
-              include: { prizes: true },
+              include: { 
+                prizes: true,
+                channels: true,
+                _count: { select: { participants: true } }
+              },
             })
 
             if (!lottery) {
@@ -211,19 +242,32 @@ export async function POST(request: NextRequest) {
               return NextResponse.json({ ok: true })
             }
 
-            // 显示抽奖信息
-            let message = `🎉 ${lottery.title}\n\n`
-            if (lottery.description) {
-              message += `${lottery.description}\n\n`
-            }
-            if (lottery.prizes && lottery.prizes.length > 0) {
-              message += '🎁 奖品列表：\n'
-              lottery.prizes.forEach((prize: any) => {
-                message += `  • ${prize.name} (${prize.remaining}/${prize.total})\n`
-              })
-              message += '\n'
-            }
-            message += '点击下方按钮参与抽奖！'
+            // 使用模板构建消息
+            const template = await getTemplate('user_join_prompt', lottery.createdBy)
+            const botUsername = await getBotUsername()
+            
+            const goodsList = lottery.prizes && lottery.prizes.length > 0
+              ? lottery.prizes.map((p: any) => `💰 ${p.name} × ${p.total}`).join('\n')
+              : '暂无奖品'
+            
+            const drawTime = lottery.drawTime 
+              ? new Date(lottery.drawTime).toLocaleString('zh-CN')
+              : ''
+            const openCondition = lottery.drawType === 'time' 
+              ? `${drawTime} 自动开奖` 
+              : `满 ${lottery.drawCount} 人开奖`
+            
+            const lotteryLink = `https://t.me/${botUsername}?start=lottery_${lottery.id}`
+            
+            const message = replaceAllPlaceholders(template, {
+              lotterySn: lottery.id.slice(0, 8),
+              lotteryTitle: lottery.title,
+              lotteryDesc: lottery.description || '',
+              goodsList,
+              openCondition,
+              joinNum: lottery._count.participants,
+              lotteryLink,
+            })
 
             await sendMessage(chatId, message, {
               reply_markup: {

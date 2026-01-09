@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { prisma } from './prisma'
+import { getDefaultTemplate } from './placeholders'
 
 // Telegram User type
 export interface TelegramUser {
@@ -252,4 +253,45 @@ export function replaceTemplateVariables(template: string, data: {
     }
   }
   return result
+}
+
+// 获取模板内容
+export async function getTemplate(type: string, createdBy?: string): Promise<string> {
+  try {
+    // If createdBy is provided, try to find user-specific template
+    if (createdBy) {
+      const template = await prisma.template.findFirst({
+        where: { 
+          type,
+          createdBy 
+        },
+        orderBy: {
+          updatedAt: 'desc'
+        }
+      })
+      
+      if (template && template.content) {
+        return template.content
+      }
+    }
+    
+    // Try to find any template of this type (fallback)
+    const template = await prisma.template.findFirst({
+      where: { type },
+      orderBy: {
+        updatedAt: 'desc'
+      }
+    })
+    
+    if (template && template.content) {
+      return template.content
+    }
+    
+    // Return default template
+    return getDefaultTemplate(type)
+  } catch (error) {
+    console.error('Error fetching template:', error)
+    // Return default template on error
+    return getDefaultTemplate(type)
+  }
 }
