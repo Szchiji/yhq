@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       // Import here to avoid circular dependencies
       const { answerCallbackQuery } = await import('@/lib/telegram')
       const { prisma } = await import('@/lib/prisma')
+      const { publishLottery } = await import('@/lib/lottery')
 
       if (data.startsWith('join_')) {
         // 参与抽奖
@@ -64,9 +65,113 @@ export async function POST(request: NextRequest) {
           await answerCallbackQuery(callbackQuery.id, '处理失败')
           await sendMessage(chatId, '处理失败，请稍后重试')
         }
-      } else {
-        await answerCallbackQuery(callbackQuery.id, '处理中...')
+        return NextResponse.json({ ok: true })
       }
+
+      // 推送到单个群组
+      if (data.startsWith('publish_') && !data.startsWith('publish_all_')) {
+        const parts = data.split('_')
+        const lotteryId = parts[1]
+        const targetChatId = parts[2]
+        const force = data.includes('_force')
+        
+        try {
+          // 检查是否已推送过
+          if (!force) {
+            const existingPublish = await prisma.lotteryPublish.findFirst({
+              where: { lotteryId, chatId: targetChatId },
+              orderBy: { publishedAt: 'desc' }
+            })
+            
+            if (existingPublish) {
+              // 显示确认提示
+              const publishDate = existingPublish.publishedAt.toLocaleString('zh-CN')
+              await sendMessage(chatId, `⚠️ 该抽奖已于 ${publishDate} 推送到「${existingPublish.chatTitle}」\n\n确定要再次推送吗？`, {
+                reply_markup: {
+                  inline_keyboard: [[
+                    { text: '✅ 确认推送', callback_data: `publish_${lotteryId}_${targetChatId}_force` },
+                    { text: '❌ 取消', callback_data: 'cancel' }
+                  ]]
+                }
+              })
+              await answerCallbackQuery(callbackQuery.id)
+              return NextResponse.json({ ok: true })
+            }
+          }
+          
+          // 执行推送
+          await publishLottery(lotteryId, targetChatId, userId)
+          await answerCallbackQuery(callbackQuery.id, '✅ 已推送')
+          await sendMessage(chatId, '✅ 抽奖已成功推送到群组')
+        } catch (error) {
+          console.error('Error publishing lottery:', error)
+          await answerCallbackQuery(callbackQuery.id, '推送失败')
+          await sendMessage(chatId, '❌ 推送失败，请稍后重试')
+        }
+        return NextResponse.json({ ok: true })
+      }
+      
+      // 推送到全部
+      if (data.startsWith('publish_all_')) {
+        const lotteryId = data.replace('publish_all_', '').replace('_force', '')
+        const force = data.includes('_force')
+        
+        try {
+          const lottery = await prisma.lottery.findUnique({
+            where: { id: lotteryId },
+            include: { publishes: true }
+          })
+          
+          if (!lottery) {
+            await answerCallbackQuery(callbackQuery.id, '抽奖不存在')
+            return NextResponse.json({ ok: true })
+          }
+          
+          // 检查是否有已推送的
+          if (!force && lottery.publishes.length > 0) {
+            const chatNames = lottery.publishes.map(p => p.chatTitle || p.chatId).join('、')
+            await sendMessage(chatId, `⚠️ 该抽奖已推送到以下群组：\n${chatNames}\n\n确定要再次推送到所有群组吗？`, {
+              reply_markup: {
+                inline_keyboard: [[
+                  { text: '✅ 全部重新推送', callback_data: `publish_all_${lotteryId}_force` },
+                  { text: '❌ 取消', callback_data: 'cancel' }
+                ]]
+              }
+            })
+            await answerCallbackQuery(callbackQuery.id)
+            return NextResponse.json({ ok: true })
+          }
+          
+          // 推送到所有群组
+          let successCount = 0
+          const channels = lottery.requireChannels || []
+          for (const targetChatId of channels) {
+            try {
+              await publishLottery(lotteryId, targetChatId, userId)
+              successCount++
+            } catch (e) {
+              console.error(`Failed to publish to ${targetChatId}:`, e)
+            }
+          }
+          
+          await answerCallbackQuery(callbackQuery.id, `✅ 已推送到 ${successCount} 个群组`)
+          await sendMessage(chatId, `✅ 成功推送到 ${successCount}/${channels.length} 个群组`)
+        } catch (error) {
+          console.error('Error in publish all:', error)
+          await answerCallbackQuery(callbackQuery.id, '推送失败')
+          await sendMessage(chatId, '❌ 推送失败，请稍后重试')
+        }
+        return NextResponse.json({ ok: true })
+      }
+      
+      // 取消操作
+      if (data === 'cancel') {
+        await answerCallbackQuery(callbackQuery.id, '已取消')
+        await sendMessage(chatId, '操作已取消')
+        return NextResponse.json({ ok: true })
+      }
+
+      await answerCallbackQuery(callbackQuery.id, '处理中...')
 
       return NextResponse.json({ ok: true })
     }
@@ -274,6 +379,12 @@ export async function POST(request: NextRequest) {
             ]]
           }
         })
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle /help command
+      if (text === '/help') {
+        await sendMessage(chatId, '📖 使用帮助\n\n/bot - 打开管理后台\n/new - 创建新抽奖\n/mylottery - 查看我的抽奖\n\n如需帮助，请联系管理员。')
         return NextResponse.json({ ok: true })
       }
     }
