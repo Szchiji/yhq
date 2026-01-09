@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/RichTextEditor'
 
-const tabs = [
-  '编辑成功模板',
-  '用户参与提示模板',
-  '用户参加成功模板',
-  '中奖私聊用户模板',
-  '中奖私聊创建人模板',
-  '中奖公开通知模板',
+const templateTypes = [
+  { key: 'edit_success', name: '编辑成功模板' },
+  { key: 'user_join_prompt', name: '用户参与提示模板' },
+  { key: 'user_join_success', name: '用户参加成功模板' },
+  { key: 'winner_private', name: '中奖私聊用户模板' },
+  { key: 'creator_private', name: '中奖私聊创建人模板' },
+  { key: 'winner_public', name: '中奖公开通知模板' },
 ]
 
 const placeholders = [
@@ -20,35 +20,71 @@ const placeholders = [
   '{openCondition}',
   '{goodsList}',
   '{lotteryLink}',
+  '{member}',
+  '{goodsName}',
 ]
 
 export default function TemplatesPage() {
   const [activeTab, setActiveTab] = useState(0)
-  const [editorContent, setEditorContent] = useState(`抽奖信息
+  const [templates, setTemplates] = useState<Record<string, any>>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [editorContent, setEditorContent] = useState('')
+  const [buttons, setButtons] = useState<Array<{ text: string; url: string }>>([])
 
-奖品标题：{lotteryTitle}
+  useEffect(() => {
+    fetchTemplates()
+  }, [])
 
-参与条件：{joinCondition}
+  useEffect(() => {
+    // Load template data when tab changes
+    const currentType = templateTypes[activeTab].key
+    const template = templates[currentType]
+    if (template) {
+      setEditorContent(template.content)
+      setButtons(template.buttons || [])
+    } else {
+      // Set default content
+      setEditorContent(getDefaultContent(currentType))
+      setButtons([])
+    }
+  }, [activeTab, templates])
 
-开奖条件：{openCondition}
+  const fetchTemplates = async () => {
+    try {
+      const response = await fetch('/api/templates')
+      if (response.ok) {
+        const data = await response.json()
+        const templatesMap: Record<string, any> = {}
+        data.data.forEach((t: any) => {
+          templatesMap[t.type] = t
+        })
+        setTemplates(templatesMap)
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-奖品列表：
-{goodsList}
-
-抽奖链接：{lotteryLink}
-
-祝所有参与者好运！`)
-
-  const [buttons, setButtons] = useState([
-    { text: '参与抽奖', url: '' },
-  ])
+  const getDefaultContent = (type: string) => {
+    const defaults: Record<string, string> = {
+      edit_success: '抽奖已成功编辑！',
+      user_join_prompt: '点击下方按钮参与抽奖：{lotteryTitle}',
+      user_join_success: '恭喜！您已成功参与抽奖：{lotteryTitle}',
+      winner_private: '恭喜 {member}！您中奖了：{goodsName}',
+      creator_private: '抽奖"{lotteryTitle}"已开奖，中奖用户已通知。',
+      winner_public: '抽奖结果已公布！中奖名单：{awardUserList}',
+    }
+    return defaults[type] || ''
+  }
 
   const addButton = () => {
     setButtons([...buttons, { text: '', url: '' }])
   }
 
   const addRow = () => {
-    // Add multiple buttons as a new row
     setButtons([...buttons, { text: '', url: '' }])
   }
 
@@ -62,6 +98,49 @@ export default function TemplatesPage() {
     setButtons(buttons.filter((_, i) => i !== index))
   }
 
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      // Get initData from Telegram WebApp
+      const initData = (window as any).Telegram?.WebApp?.initData || ''
+      
+      const currentType = templateTypes[activeTab].key
+      const response = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          initData,
+          template: {
+            type: currentType,
+            content: editorContent,
+            buttons: buttons.length > 0 ? buttons : null,
+          },
+        }),
+      })
+
+      if (response.ok) {
+        alert('保存成功！')
+        fetchTemplates()
+      } else {
+        const error = await response.json()
+        alert(`保存失败：${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error saving template:', error)
+      alert('保存失败，请稍后重试')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-gray-500">加载中...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">抽奖消息模板</h1>
@@ -69,7 +148,7 @@ export default function TemplatesPage() {
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow">
         <div className="flex border-b border-gray-200 overflow-x-auto">
-          {tabs.map((tab, index) => (
+          {templateTypes.map((template, index) => (
             <button
               key={index}
               onClick={() => setActiveTab(index)}
@@ -79,7 +158,7 @@ export default function TemplatesPage() {
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
-              {tab}
+              {template.name}
             </button>
           ))}
         </div>
@@ -157,8 +236,12 @@ export default function TemplatesPage() {
 
           {/* Submit Button */}
           <div className="flex justify-end pt-3 sm:pt-4 border-t border-gray-200">
-            <button className="px-4 sm:px-6 py-2 sm:py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors text-sm">
-              提交
+            <button 
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 sm:px-6 py-2 sm:py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm"
+            >
+              {saving ? '保存中...' : '保存'}
             </button>
           </div>
         </div>

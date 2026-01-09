@@ -152,7 +152,8 @@ export async function sendLotteryMessage(chatId: string | number, lottery: any) 
   const botUsername = process.env.BOT_USERNAME || 'lottery_bot'
   const participateUrl = `https://t.me/${botUsername}?start=lottery_${lottery.id}`
   
-  return sendMessage(chatId, message, {
+  const chatIdNumber = typeof chatId === 'string' ? parseInt(chatId) : chatId
+  return sendMessage(chatIdNumber, message, {
     reply_markup: {
       inline_keyboard: [[
         { text: '🎯 参与抽奖', url: participateUrl }

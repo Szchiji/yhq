@@ -64,7 +64,6 @@ export default function LotteryPage() {
           + 创建抽奖
         </button>
       </div>
-      </div>
 
       {/* Filter */}
       <div className="bg-white rounded-lg shadow p-3 sm:p-4">

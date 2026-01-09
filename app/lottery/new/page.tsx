@@ -9,6 +9,11 @@ type Prize = {
   total: number
 }
 
+const notificationPlaceholders = [
+  '{member}', '{lotteryTitle}', '{goodsName}', '{creator}',
+  '{creatorId}', '{creatorName}', '{lotterySn}', '{awardUserList}', '{joinNum}'
+]
+
 export default function NewLotteryPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -36,7 +41,7 @@ export default function NewLotteryPage() {
   // Notifications
   const [winnerNotification, setWinnerNotification] = useState('恭喜 {member}！您中奖了：{goodsName}')
   const [creatorNotification, setCreatorNotification] = useState('抽奖"{lotteryTitle}"已开奖，中奖用户已通知。')
-  const [groupNotification, setGroupNotification] = useState('抽奖结果已公布！中奖名单：{awardUserList}')
+  const [groupNotification] = useState('抽奖结果已公布！中奖名单：{awardUserList}')
 
   const tabs = ['基础信息', '奖品设置', '通知设置']
 
@@ -135,23 +140,7 @@ export default function NewLotteryPage() {
     }
   }
 
-  const notificationPlaceholders = [
-    '{member}', '{lotteryTitle}', '{goodsName}', '{creator}',
-    '{creatorId}', '{creatorName}', '{lotterySn}', '{awardUserList}', '{joinNum}'
-  ]
-
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">创建新抽奖</h1>
-        <button
-          onClick={() => router.back()}
-          className="px-3 py-1.5 sm:py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs sm:text-sm"
-        >
-          返回
-        </button>
-      </div>
-
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">创建新抽奖</h1>
@@ -468,17 +457,6 @@ export default function NewLotteryPage() {
                 <textarea
                   value={creatorNotification}
                   onChange={(e) => setCreatorNotification(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[70px] font-mono text-xs sm:text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  中奖发送到群/频道通知
-                </label>
-                <textarea
-                  value={groupNotification}
-                  onChange={(e) => setGroupNotification(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[70px] font-mono text-xs sm:text-sm"
                 />
               </div>
