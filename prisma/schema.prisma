@@ -57,6 +57,9 @@ model Lottery {
   creatorNotification String @default("抽奖\"{lotteryTitle}\"已开奖，中奖用户已通知。")
   groupNotification   String @default("抽奖结果已公布！中奖名单：{awardUserList}")
   
+  // 推送消息模板
+  publishTemplate     String @default("🎉 {lotteryTitle}\n\n{lotteryDesc}\n\n🎁 奖品：{goodsList}\n👥 参与条件：{joinCondition}\n⏰ 开奖条件：{openCondition}\n\n当前参与：{joinNum} 人")
+  
   // 关联
   createdBy       String   // 创建者 Telegram ID
   createdAt       DateTime @default(now())
@@ -66,6 +69,7 @@ model Lottery {
   prizes          Prize[]
   participants    Participant[]
   winners         Winner[]
+  publishes       LotteryPublish[]
 }
 
 // 奖品
@@ -109,10 +113,24 @@ model Winner {
   wonAt       DateTime @default(now())
 }
 
+// 推送记录
+model LotteryPublish {
+  id          String   @id @default(cuid())
+  lotteryId   String
+  lottery     Lottery  @relation(fields: [lotteryId], references: [id], onDelete: Cascade)
+  chatId      String   // 推送到的群/频道 ID
+  chatTitle   String?  // 群/频道名称
+  messageId   String?  // 推送的消息 ID（用于编辑更新）
+  publishedAt DateTime @default(now())
+  publishedBy String   // 推送者 Telegram ID
+  
+  @@index([lotteryId, chatId])
+}
+
 // 消息模板
 model Template {
   id          String   @id @default(cuid())
-  type        String   // edit_success, user_join_prompt, user_join_success, winner_private, creator_private, winner_public
+  type        String   // edit_success, user_join_prompt, user_join_success, winner_private, creator_private, winner_public, publish
   content     String
   buttons     Json?    // 按钮配置 [{text: string, url: string}]
   createdBy   String

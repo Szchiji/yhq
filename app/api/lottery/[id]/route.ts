@@ -15,6 +15,11 @@ export async function GET(request: NextRequest, { params }: Params) {
       where: { id: params.id },
       include: {
         prizes: true,
+        publishes: {
+          orderBy: {
+            publishedAt: 'desc'
+          }
+        },
         _count: {
           select: {
             participants: true,
@@ -91,6 +96,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
         winnerNotification: lottery.winnerNotification,
         creatorNotification: lottery.creatorNotification,
         groupNotification: lottery.groupNotification,
+        publishTemplate: lottery.publishTemplate,
       },
       include: {
         prizes: true,

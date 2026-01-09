@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
+import { sendCreateSuccessMessage } from '@/lib/lottery'
 
 // GET - 获取抽奖列表（支持分页和筛选）
 export async function GET(request: NextRequest) {
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest) {
         winnerNotification: lottery.winnerNotification || '恭喜 {member}！您中奖了：{goodsName}',
         creatorNotification: lottery.creatorNotification || '抽奖"{lotteryTitle}"已开奖，中奖用户已通知。',
         groupNotification: lottery.groupNotification || '抽奖结果已公布！中奖名单：{awardUserList}',
+        publishTemplate: lottery.publishTemplate || '🎉 {lotteryTitle}\n\n{lotteryDesc}\n\n🎁 奖品：{goodsList}\n👥 参与条件：{joinCondition}\n⏰ 开奖条件：{openCondition}\n\n当前参与：{joinNum} 人',
         createdBy: user.id.toString(),
         prizes: {
           create: (lottery.prizes || []).map((prize: any) => ({
@@ -117,6 +119,14 @@ export async function POST(request: NextRequest) {
         prizes: true,
       },
     })
+
+    // 发送创建成功消息到创建者的 Telegram
+    try {
+      await sendCreateSuccessMessage(createdLottery, user.id.toString())
+    } catch (error) {
+      console.error('Failed to send create success message:', error)
+      // Don't fail the request if notification fails
+    }
 
     return NextResponse.json(createdLottery, { status: 201 })
   } catch (error) {

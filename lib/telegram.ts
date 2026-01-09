@@ -47,7 +47,7 @@ export function parseTelegramUser(initData: string): TelegramUser | null {
 }
 
 // Send message via Telegram Bot API
-export async function sendMessage(chatId: number, text: string, options?: any) {
+export async function sendMessage(chatId: number | string, text: string, options?: any) {
   const botToken = process.env.BOT_TOKEN
   if (!botToken) {
     throw new Error('BOT_TOKEN is not set')
@@ -83,19 +83,21 @@ export function isSuperAdmin(telegramId: string): boolean {
 }
 
 // 回应 callback_query
-export async function answerCallbackQuery(callbackQueryId: string, text?: string) {
+export async function answerCallbackQuery(callbackQueryId: string, text?: string, showAlert?: boolean) {
   const botToken = process.env.BOT_TOKEN
   if (!botToken) {
     throw new Error('BOT_TOKEN is not set')
   }
-  await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       callback_query_id: callbackQueryId,
       text,
+      show_alert: showAlert,
     }),
   })
+  return response.json()
 }
 
 // 检查用户是否在频道/群组中
@@ -162,17 +164,85 @@ export async function sendLotteryMessage(chatId: string | number, lottery: any) 
   })
 }
 
+// 获取机器人信息
+export async function getBotInfo() {
+  const botToken = process.env.BOT_TOKEN
+  if (!botToken) {
+    throw new Error('BOT_TOKEN is not set')
+  }
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`)
+  return response.json()
+}
+
+// 获取机器人用户名
+export async function getBotUsername(): Promise<string> {
+  const botInfo = await getBotInfo()
+  return botInfo.result?.username || process.env.BOT_USERNAME || 'lottery_bot'
+}
+
+// 获取群组/频道信息
+export async function getChat(chatId: string) {
+  const botToken = process.env.BOT_TOKEN
+  if (!botToken) {
+    throw new Error('BOT_TOKEN is not set')
+  }
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/getChat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId })
+  })
+  return response.json()
+}
+
+// 获取群成员信息
+export async function getChatMember(chatId: string, userId: string | number) {
+  const botToken = process.env.BOT_TOKEN
+  if (!botToken) {
+    throw new Error('BOT_TOKEN is not set')
+  }
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/getChatMember`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, user_id: userId })
+  })
+  return response.json()
+}
+
+// 编辑消息
+export async function editMessageText(chatId: string | number, messageId: number, text: string, options?: any) {
+  const botToken = process.env.BOT_TOKEN
+  if (!botToken) {
+    throw new Error('BOT_TOKEN is not set')
+  }
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: 'HTML',
+      ...options
+    })
+  })
+  return response.json()
+}
+
 // 替换模板变量
 export function replaceTemplateVariables(template: string, data: {
   member?: string
   lotteryTitle?: string
+  lotteryDesc?: string
   goodsName?: string
+  goodsList?: string
   creator?: string
   creatorId?: string
   creatorName?: string
   lotterySn?: string
   awardUserList?: string
   joinNum?: number
+  joinCondition?: string
+  openCondition?: string
 }): string {
   let result = template
   // Pre-compile patterns for better performance
