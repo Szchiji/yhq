@@ -1,23 +1,89 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTelegramWebApp } from '@/hooks/useTelegramWebApp'
 
 export default function BillingSettingsPage() {
+  const { initData } = useTelegramWebApp()
+  const [loading, setLoading] = useState(true)
   const [enableBilling, setEnableBilling] = useState(false)
   const [defaultPrice, setDefaultPrice] = useState('')
   const [currency, setCurrency] = useState('USDT')
   const [paymentInstructions, setPaymentInstructions] = useState('')
+  const [expiryReminderDays, setExpiryReminderDays] = useState('7')
   const [showSuccess, setShowSuccess] = useState(false)
 
-  const handleSave = () => {
-    console.log('Saving billing settings:', {
-      enableBilling,
-      defaultPrice,
-      currency,
-      paymentInstructions,
-    })
-    setShowSuccess(true)
-    setTimeout(() => setShowSuccess(false), 3000)
+  const fetchSettings = async () => {
+    try {
+      const response = await fetch('/api/billing/settings', {
+        headers: {
+          'x-telegram-init-data': initData || '',
+        },
+      })
+      if (response.ok) {
+        const result = await response.json()
+        const settings = result.data || {}
+        
+        setEnableBilling(settings.enable_billing === 'true')
+        setDefaultPrice(settings.default_price || '')
+        setCurrency(settings.currency || 'USDT')
+        setPaymentInstructions(settings.payment_instructions || '')
+        setExpiryReminderDays(settings.expiry_reminder_days || '7')
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (initData) {
+      fetchSettings()
+    }
+  }, [initData])
+
+  const handleSave = async () => {
+    try {
+      const response = await fetch('/api/billing/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-telegram-init-data': initData || '',
+        },
+        body: JSON.stringify({
+          settings: {
+            enable_billing: String(enableBilling),
+            default_price: defaultPrice,
+            currency: currency,
+            payment_instructions: paymentInstructions,
+            expiry_reminder_days: expiryReminderDays,
+          }
+        }),
+      })
+
+      if (response.ok) {
+        setShowSuccess(true)
+        setTimeout(() => setShowSuccess(false), 3000)
+      } else {
+        const error = await response.json()
+        alert(`保存失败: ${error.error || '未知错误'}`)
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      alert('保存失败')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4 sm:space-y-6">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">收费设置</h1>
+        <div className="bg-white rounded-lg shadow p-3 sm:p-4 md:p-6">
+          <p className="text-gray-600 text-sm sm:text-base">加载中...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -58,6 +124,9 @@ export default function BillingSettingsPage() {
             placeholder="例如：10"
             disabled={!enableBilling}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            未配置续费规则时使用的默认价格
+          </p>
         </div>
 
         <div>
@@ -79,6 +148,23 @@ export default function BillingSettingsPage() {
 
         <div>
           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+            过期提醒天数
+          </label>
+          <input
+            type="number"
+            value={expiryReminderDays}
+            onChange={(e) => setExpiryReminderDays(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100"
+            placeholder="7"
+            disabled={!enableBilling}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            在用户过期前多少天提醒续费
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
             付款说明
           </label>
           <textarea
@@ -88,6 +174,9 @@ export default function BillingSettingsPage() {
             placeholder="请输入付款说明，例如付款流程、注意事项等"
             disabled={!enableBilling}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            用户付款时显示的说明文字
+          </p>
         </div>
 
         <div className="flex justify-end pt-3 sm:pt-4 border-t border-gray-200">
