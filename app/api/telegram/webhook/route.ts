@@ -6,10 +6,20 @@ function getWebAppUrl(): string {
   return process.env.WEBAPP_URL || process.env.VERCEL_URL || ''
 }
 
+// Health check endpoint
+export async function GET() {
+  return NextResponse.json({ 
+    ok: true, 
+    message: 'Webhook is active',
+    timestamp: new Date().toISOString()
+  })
+}
+
 // Telegram Bot webhook handler
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    console.log('Webhook received:', JSON.stringify(body).slice(0, 500))
     
     // Handle callback_query (button clicks)
     if (body.callback_query) {
@@ -257,118 +267,128 @@ export async function POST(request: NextRequest) {
       const text = message.text || ''
       const userId = message.from?.id?.toString()
 
-      // Handle /start command
+      // Handle /start command - 简化版本，确保基本功能
       if (text === '/start' || text.startsWith('/start ')) {
-        const startParam = text.split(' ')[1]
-        
-        if (startParam?.startsWith('lottery_')) {
-          // 参与抽奖逻辑
-          const lotteryId = startParam.replace('lottery_', '')
+        try {
+          const startParam = text.split(' ')[1]
           
-          try {
-            const { prisma } = await import('@/lib/prisma')
-            const { getTemplate } = await import('@/lib/telegram')
-            const { replaceAllPlaceholders } = await import('@/lib/placeholders')
-            const { getBotUsername } = await import('@/lib/telegram')
+          if (startParam?.startsWith('lottery_')) {
+            // 参与抽奖逻辑
+            const lotteryId = startParam.replace('lottery_', '')
             
-            const lottery = await prisma.lottery.findUnique({
-              where: { id: lotteryId },
-              include: { 
-                prizes: true,
-                channels: true,
-                _count: { select: { participants: true } }
-              },
-            })
+            try {
+              const { prisma } = await import('@/lib/prisma')
+              const { getTemplate } = await import('@/lib/telegram')
+              const { replaceAllPlaceholders } = await import('@/lib/placeholders')
+              const { getBotUsername } = await import('@/lib/telegram')
+              
+              const lottery = await prisma.lottery.findUnique({
+                where: { id: lotteryId },
+                include: { 
+                  prizes: true,
+                  channels: true,
+                  _count: { select: { participants: true } }
+                },
+              })
 
-            if (!lottery) {
-              await sendMessage(chatId, '⚠️ 抽奖不存在或已结束')
-              return NextResponse.json({ ok: true })
-            }
-
-            if (lottery.status !== 'active') {
-              await sendMessage(chatId, '⚠️ 抽奖已结束')
-              return NextResponse.json({ ok: true })
-            }
-
-            // 使用模板构建消息
-            const template = await getTemplate('user_join_prompt', lottery.createdBy)
-            const botUsername = await getBotUsername()
-            
-            const goodsList = lottery.prizes && lottery.prizes.length > 0
-              ? lottery.prizes.map((p: any) => `💰 ${p.name} × ${p.total}`).join('\n')
-              : '暂无奖品'
-            
-            const drawTime = lottery.drawTime 
-              ? new Date(lottery.drawTime).toLocaleString('zh-CN')
-              : ''
-            const openCondition = lottery.drawType === 'time' 
-              ? `${drawTime} 自动开奖` 
-              : `满 ${lottery.drawCount} 人开奖`
-            
-            const lotteryLink = `https://t.me/${botUsername}?start=lottery_${lottery.id}`
-            
-            const message = replaceAllPlaceholders(template, {
-              lotterySn: lottery.id.slice(0, 8),
-              lotteryTitle: lottery.title,
-              lotteryDesc: lottery.description || '',
-              goodsList,
-              openCondition,
-              joinNum: lottery._count.participants,
-              lotteryLink,
-            })
-
-            await sendMessage(chatId, message, {
-              reply_markup: {
-                inline_keyboard: [[
-                  { text: '🎯 参与抽奖', callback_data: `join_${lotteryId}` }
-                ]]
+              if (!lottery) {
+                await sendMessage(chatId, '⚠️ 抽奖不存在或已结束')
+                return NextResponse.json({ ok: true })
               }
-            })
-          } catch (error) {
-            console.error('Error handling lottery start:', error)
-            await sendMessage(chatId, '⚠️ 处理失败，请稍后重试')
-          }
-        } else if (startParam?.startsWith('invite_')) {
-          // 处理邀请链接
-          const parts = startParam.replace('invite_', '').split('_')
-          const lotteryId = parts[0]
-          const inviterId = parts[1]
-          
-          try {
-            const { prisma } = await import('@/lib/prisma')
-            const lottery = await prisma.lottery.findUnique({
-              where: { id: lotteryId },
-              include: { prizes: true },
-            })
 
-            if (!lottery || lottery.status !== 'active') {
-              await sendMessage(chatId, '⚠️ 抽奖不存在或已结束')
-              return NextResponse.json({ ok: true })
-            }
-
-            // 显示抽奖信息并记录邀请关系
-            let message = `🎉 ${lottery.title}\n\n`
-            if (lottery.description) {
-              message += `${lottery.description}\n\n`
-            }
-            message += `👥 您通过邀请链接参与抽奖\n\n`
-            message += '点击下方按钮参与抽奖！'
-
-            // Store inviter info in callback data
-            await sendMessage(chatId, message, {
-              reply_markup: {
-                inline_keyboard: [[
-                  { text: '🎯 参与抽奖', callback_data: `join_${lotteryId}` }
-                ]]
+              if (lottery.status !== 'active') {
+                await sendMessage(chatId, '⚠️ 抽奖已结束')
+                return NextResponse.json({ ok: true })
               }
-            })
-          } catch (error) {
-            console.error('Error handling invite start:', error)
-            await sendMessage(chatId, '⚠️ 处理失败，请稍后重试')
+
+              // 使用模板构建消息
+              const template = await getTemplate('user_join_prompt', lottery.createdBy)
+              const botUsername = await getBotUsername()
+              
+              const goodsList = lottery.prizes && lottery.prizes.length > 0
+                ? lottery.prizes.map((p: any) => `💰 ${p.name} × ${p.total}`).join('\n')
+                : '暂无奖品'
+              
+              const drawTime = lottery.drawTime 
+                ? new Date(lottery.drawTime).toLocaleString('zh-CN')
+                : ''
+              const openCondition = lottery.drawType === 'time' 
+                ? `${drawTime} 自动开奖` 
+                : `满 ${lottery.drawCount} 人开奖`
+              
+              const lotteryLink = `https://t.me/${botUsername}?start=lottery_${lottery.id}`
+              
+              const message = replaceAllPlaceholders(template, {
+                lotterySn: lottery.id.slice(0, 8),
+                lotteryTitle: lottery.title,
+                lotteryDesc: lottery.description || '',
+                goodsList,
+                openCondition,
+                joinNum: lottery._count.participants,
+                lotteryLink,
+              })
+
+              await sendMessage(chatId, message, {
+                reply_markup: {
+                  inline_keyboard: [[
+                    { text: '🎯 参与抽奖', callback_data: `join_${lotteryId}` }
+                  ]]
+                }
+              })
+            } catch (error) {
+              console.error('Error handling lottery start:', error)
+              await sendMessage(chatId, '⚠️ 处理失败，请稍后重试')
+            }
+          } else if (startParam?.startsWith('invite_')) {
+            // 处理邀请链接
+            const parts = startParam.replace('invite_', '').split('_')
+            const lotteryId = parts[0]
+            const inviterId = parts[1]
+            
+            try {
+              const { prisma } = await import('@/lib/prisma')
+              const lottery = await prisma.lottery.findUnique({
+                where: { id: lotteryId },
+                include: { prizes: true },
+              })
+
+              if (!lottery || lottery.status !== 'active') {
+                await sendMessage(chatId, '⚠️ 抽奖不存在或已结束')
+                return NextResponse.json({ ok: true })
+              }
+
+              // 显示抽奖信息并记录邀请关系
+              let message = `🎉 ${lottery.title}\n\n`
+              if (lottery.description) {
+                message += `${lottery.description}\n\n`
+              }
+              message += `👥 您通过邀请链接参与抽奖\n\n`
+              message += '点击下方按钮参与抽奖！'
+
+              // Store inviter info in callback data
+              await sendMessage(chatId, message, {
+                reply_markup: {
+                  inline_keyboard: [[
+                    { text: '🎯 参与抽奖', callback_data: `join_${lotteryId}` }
+                  ]]
+                }
+              })
+            } catch (error) {
+              console.error('Error handling invite start:', error)
+              await sendMessage(chatId, '⚠️ 处理失败，请稍后重试')
+            }
+          } else {
+            // 普通欢迎消息 - 简单版本，不依赖数据库
+            await sendMessage(chatId, '👋 欢迎使用抽奖机器人！\n\n使用以下命令：\n/new - 创建抽奖\n/mylottery - 我的抽奖\n/vip - VIP会员')
           }
-        } else {
-          // 普通欢迎消息
-          await sendMessage(chatId, '👋 欢迎使用抽奖机器人！\n\n使用以下命令：\n/new - 创建抽奖\n/mylottery - 我的抽奖')
+        } catch (error) {
+          console.error('Error handling /start:', error)
+          // 确保至少发送一个欢迎消息
+          try {
+            await sendMessage(chatId, '👋 欢迎使用抽奖机器人！')
+          } catch (fallbackError) {
+            console.error('Failed to send fallback message:', fallbackError)
+          }
         }
         return NextResponse.json({ ok: true })
       }
@@ -560,6 +580,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Webhook error:', error)
-    return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })
+    // Return 200 to avoid Telegram retrying
+    return NextResponse.json({ ok: false, error: String(error) })
   }
 }
