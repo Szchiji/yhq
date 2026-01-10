@@ -14,7 +14,6 @@ type User = {
   vipExpireAt: string | null
   canCreateLottery: boolean
   canJoinLottery: boolean
-  createdCount: number
   participatedCount: number
   wonCount: number
   createdAt: string
