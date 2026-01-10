@@ -272,6 +272,7 @@ export async function POST(request: NextRequest) {
         try {
           // 自动记录用户到数据库
           const user = message.from
+          const now = new Date()
           
           if (user) {
             const { prisma } = await import('@/lib/prisma')
@@ -282,13 +283,13 @@ export async function POST(request: NextRequest) {
                 username: user.username || null,
                 firstName: user.first_name || null,
                 lastName: user.last_name || null,
-                lastActiveAt: new Date(),
+                lastActiveAt: now,
               },
               update: {
                 username: user.username || null,
                 firstName: user.first_name || null,
                 lastName: user.last_name || null,
-                lastActiveAt: new Date(),
+                lastActiveAt: now,
               }
             })
           }
