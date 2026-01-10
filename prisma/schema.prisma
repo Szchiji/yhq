@@ -28,6 +28,8 @@ model User {
   vipExpireAt       DateTime?
   canCreateLottery  Boolean   @default(true)
   canJoinLottery    Boolean   @default(true)
+  dailyJoinCount    Int       @default(0)
+  dailyJoinResetAt  DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 }
@@ -178,4 +180,44 @@ model BotCommand {
   isEnabled   Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// 系统设置
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// VIP套餐
+model VipPlan {
+  id          String     @id @default(cuid())
+  name        String
+  days        Int        // -1 表示永久
+  price       Decimal    @db.Decimal(10, 2)
+  currency    String     @default("USDT")
+  description String?
+  isEnabled   Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  createdBy   String
+  orders      VipOrder[]
+}
+
+// VIP订单
+model VipOrder {
+  id         String    @id @default(cuid())
+  orderNo    String    @unique
+  telegramId String
+  planId     String
+  plan       VipPlan   @relation(fields: [planId], references: [id])
+  amount     Decimal   @db.Decimal(10, 2)
+  currency   String
+  status     String    @default("pending") // pending, paid, cancelled
+  paidAt     DateTime?
+  expireAt   DateTime?
+  remark     String?
+  createdAt  DateTime  @default(now())
+  createdBy  String
 }

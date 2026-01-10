@@ -5,8 +5,15 @@ A Next.js application with App Router and Tailwind CSS for managing lottery bot 
 ## Features
 
 - **Telegram WebApp Authentication**: Secure authentication using Telegram Bot WebApp
+- **Multi-Super Admin Support**: Configure multiple super administrators
+- **VIP Membership System**: Complete VIP subscription management with orders
 - **Admin Management**: Super admin can add/remove administrators
-- **Responsive Layout**: Fixed sidebar navigation with collapsible menu items
+- **System Settings**: Configure lottery limits and VIP permissions
+- **Bot Commands Management**: Manage and sync bot commands to Telegram
+- **Announcement Channels**: Configure channels for lottery broadcasts
+- **User Management**: Comprehensive user control with VIP and permission management
+- **Daily Join Limits**: Configurable daily participation limits with VIP bypass
+- **Responsive Layout**: Fixed sidebar navigation with role-based menus
 - **Message Templates**: Rich text editor for customizing lottery message templates with placeholder support
 - **Lottery Management**: Comprehensive settings interface with three tabs:
   - **Basic Info**: Configure lottery title, media, description, participation methods, and draw settings
@@ -65,7 +72,8 @@ Create a `.env` file in the root directory with the following variables:
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:password@localhost:5432/yhq?schema=public` |
 | `BOT_TOKEN` | Telegram Bot Token from @BotFather | `123456:ABC-DEF...` |
-| `SUPER_ADMIN_ID` | Your Telegram User ID (numeric) | `123456789` |
+| `BOT_USERNAME` | Your bot's username (without @) | `your_lottery_bot` |
+| `SUPER_ADMIN_IDS` | Comma-separated list of super admin Telegram IDs | `123456789,987654321` |
 | `WEBAPP_URL` | WebApp access URL | `https://your-domain.railway.app` |
 
 ### Getting Your Telegram User ID
@@ -81,10 +89,13 @@ Create a `.env` file in the root directory with the following variables:
 3. Copy the bot token and set it as `BOT_TOKEN`
 4. Set bot commands:
    ```
+   /start - Start using the bot
    /bot - Open admin panel
-   /new - Create new lottery
+   /new - Create new lottery (web)
+   /create - Create lottery (chat)
    /newinvite - Create invite lottery
    /mylottery - View my lotteries
+   /vip - VIP membership center
    ```
 
 ## Railway Deployment
@@ -110,7 +121,8 @@ In your Railway project settings, add the following environment variables:
 ```env
 DATABASE_URL=<your-postgresql-connection-string>
 BOT_TOKEN=<your-telegram-bot-token>
-SUPER_ADMIN_ID=<your-telegram-user-id>
+BOT_USERNAME=<your-bot-username>
+SUPER_ADMIN_IDS=<comma-separated-telegram-user-ids>
 WEBAPP_URL=<your-railway-app-url>
 NODE_ENV=production
 ```
@@ -176,7 +188,8 @@ Replace `<BOT_TOKEN>` with your bot token and `your-domain.railway.app` with you
 |----------|-------------|----------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | Yes | `postgresql://user:pass@host:5432/db` |
 | `BOT_TOKEN` | Telegram Bot Token | Yes | `123456:ABC-DEF...` |
-| `SUPER_ADMIN_ID` | Super Admin Telegram ID | Yes | `123456789` |
+| `BOT_USERNAME` | Bot username (without @) | Yes | `your_lottery_bot` |
+| `SUPER_ADMIN_IDS` | Super Admin IDs (comma-separated) | Yes | `123456789,987654321` |
 | `WEBAPP_URL` | WebApp URL | Yes | `https://xxx.railway.app` |
 | `NODE_ENV` | Environment mode | No | `production` |
 
@@ -197,10 +210,38 @@ Replace `<BOT_TOKEN>` with your bot token and `your-domain.railway.app` with you
 
 ### Bot Commands
 
-- `/bot` - Open admin panel (admin/super admin only)
-- `/new` - Create a new lottery (admin/super admin only)
-- `/newinvite` - Create invite lottery link (admin/super admin only)
-- `/mylottery` - View my lottery list (admin/super admin only)
+**Admin/Super Admin Commands:**
+- `/bot` - Open admin panel
+- `/new` - Create a new lottery via web interface
+- `/create` - Create lottery through chat conversation
+- `/newinvite` - Create invite lottery link
+- `/mylottery` - View my lottery list
+
+**User Commands:**
+- `/start` - Start using the bot
+- `/vip` - View VIP status and purchase VIP membership
+
+### Admin Panel Pages
+
+**Super Admin Pages:**
+- Dashboard - Overview and statistics
+- Lottery List - Manage all lotteries
+- Message Templates - Customize message templates
+- Announcement Channels - Configure broadcast channels
+- User Management - Manage users, VIP status, and permissions
+- VIP Plans - Create and manage VIP membership plans
+- Orders - Process VIP orders and payments
+- Commands - Manage bot commands and sync to Telegram
+- Admin Management - Add/remove administrators
+- System Settings - Configure system-wide settings
+
+**Regular Admin Pages:**
+- Dashboard
+- Lottery List
+- Message Templates
+- User Management
+- VIP Plans
+- Orders
 
 ## Database Maintenance
 
@@ -261,7 +302,8 @@ docker run --name postgres-yhq -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d pos
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/yhq?schema=public"
 BOT_TOKEN="your-telegram-bot-token"
-SUPER_ADMIN_ID="your-telegram-user-id"
+BOT_USERNAME="your_bot_username"
+SUPER_ADMIN_IDS="your-telegram-user-id"
 WEBAPP_URL="http://localhost:3000"
 ```
 
@@ -289,26 +331,43 @@ yhq/
 │   ├── api/                 # API routes
 │   │   ├── telegram/        # Telegram webhook handler
 │   │   ├── auth/            # Authentication endpoints
-│   │   └── admins/          # Admin management API
+│   │   ├── admins/          # Admin management API
+│   │   ├── commands/        # Bot commands API
+│   │   ├── announcement-channels/ # Announcement channels API
+│   │   ├── vip-plans/       # VIP plans API
+│   │   ├── orders/          # Orders API
+│   │   ├── settings/        # System settings API
+│   │   ├── lottery/         # Lottery management API
+│   │   └── users/           # User management API
 │   ├── layout.tsx           # Root layout with Telegram WebApp script
 │   ├── page.tsx             # Home page with AuthGuard
 │   ├── templates/           # Message templates page
 │   ├── lottery/             # Lottery management pages
 │   ├── users/               # User management
+│   ├── vip-plans/           # VIP plans management
+│   ├── orders/              # Orders management
+│   ├── commands/            # Bot commands management
+│   ├── announcements/       # Announcement channels
+│   ├── settings/            # System settings
 │   ├── admins/              # Admin settings (super admin only)
 │   └── ...                  # Other pages
 ├── components/              # React components
-│   ├── Sidebar.tsx          # Navigation sidebar with Telegram user info
+│   ├── Sidebar.tsx          # Navigation sidebar with role-based menu
 │   ├── AuthGuard.tsx        # Authentication protection component
+│   ├── ButtonEditor.tsx     # Button layout editor
 │   └── ...                  # Other components
 ├── hooks/                   # Custom React hooks
 │   └── useTelegramWebApp.ts # Telegram WebApp integration hook
 ├── lib/                     # Utility libraries
 │   ├── telegram.ts          # Telegram Bot API utilities
+│   ├── auth.ts              # Authorization utilities
+│   ├── settings.ts          # System settings utilities
+│   ├── placeholders.ts      # Template placeholders
+│   ├── lottery.ts           # Lottery utilities
 │   └── prisma.ts            # Prisma client
 ├── prisma/                  # Database schema
-│   └── schema.prisma        # Prisma schema with Admin and User models
-└── middleware.ts            # Next.js middleware (simplified for WebApp)
+│   └── schema.prisma        # Prisma schema with all models
+└── middleware.ts            # Next.js middleware
 ```
 
 ## Technologies Used

@@ -66,22 +66,8 @@ export async function sendMessage(chatId: number | string, text: string, options
   return response.json()
 }
 
-// Check if user is admin
-export async function isAdmin(telegramId: string): Promise<boolean> {
-  const superAdminId = process.env.SUPER_ADMIN_ID
-  if (telegramId === superAdminId) return true
-  
-  // Query database for admin list
-  const admin = await prisma.admin.findUnique({
-    where: { telegramId }
-  })
-  return !!admin && admin.isActive
-}
-
-// Check if user is super admin
-export function isSuperAdmin(telegramId: string): boolean {
-  return telegramId === process.env.SUPER_ADMIN_ID
-}
+// Check if user is admin - now imported from lib/auth
+export { isAdmin, isSuperAdmin } from './auth'
 
 // 回应 callback_query
 export async function answerCallbackQuery(callbackQueryId: string, text?: string, showAlert?: boolean) {
@@ -293,5 +279,51 @@ export async function getTemplate(type: string, createdBy?: string): Promise<str
     console.error('Error fetching template:', error)
     // Return default template on error
     return getDefaultTemplate(type)
+  }
+}
+
+/**
+ * Sync bot commands to Telegram
+ * Updates the command menu shown to users in Telegram
+ */
+export async function syncCommandsToTelegram(): Promise<boolean> {
+  try {
+    const botToken = process.env.BOT_TOKEN
+    if (!botToken) {
+      throw new Error('BOT_TOKEN is not set')
+    }
+
+    // Get enabled commands from database
+    const commands = await prisma.botCommand.findMany({
+      where: { isEnabled: true },
+      orderBy: { sortOrder: 'asc' }
+    })
+
+    // Format commands for Telegram API
+    const telegramCommands = commands.map(cmd => ({
+      command: cmd.command.replace('/', ''), // Remove leading slash
+      description: cmd.prompt || cmd.description || ''
+    }))
+
+    // Call Telegram API
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commands: telegramCommands
+      })
+    })
+
+    const result = await response.json()
+    
+    if (!result.ok) {
+      console.error('Failed to sync commands to Telegram:', result)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error syncing commands to Telegram:', error)
+    return false
   }
 }

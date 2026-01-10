@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
+import { parseTelegramUser, validateTelegramWebAppData, syncCommandsToTelegram } from '@/lib/telegram'
+import { isSuperAdmin } from '@/lib/auth'
 
 // Default commands to initialize
 const DEFAULT_COMMANDS = [
   {
     command: '/start',
     prompt: '开始',
-    description: '',
+    description: '开始使用机器人',
     sortOrder: 10,
     isEnabled: true,
   },
@@ -21,22 +22,29 @@ const DEFAULT_COMMANDS = [
   {
     command: '/create',
     prompt: '机器人创建抽奖',
-    description: '此命令用户可以通过与机器人对话方式完成抽奖的创建',
+    description: '通过对话方式完成抽奖创建',
     sortOrder: 20,
     isEnabled: true,
   },
   {
     command: '/newinvite',
     prompt: '创建邀请类型抽奖',
-    description: '此命令可以创建邀请类型抽奖',
+    description: '创建邀请类型抽奖',
     sortOrder: 30,
     isEnabled: true,
   },
   {
     command: '/mylottery',
     prompt: '我发起的抽奖',
-    description: '此命令可以查看我发起的抽奖活动',
+    description: '查看我发起的抽奖活动',
     sortOrder: 40,
+    isEnabled: true,
+  },
+  {
+    command: '/vip',
+    prompt: 'VIP会员',
+    description: '查看VIP状态和续费',
+    sortOrder: 50,
     isEnabled: true,
   },
 ]
@@ -96,8 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证用户是否为超管
-    const superAdminId = process.env.SUPER_ADMIN_ID
-    if (user.id.toString() !== superAdminId) {
+    if (!isSuperAdmin(user.id.toString())) {
       return NextResponse.json({ error: 'Unauthorized: Only super admin can manage commands' }, { status: 403 })
     }
 
@@ -137,6 +144,9 @@ export async function POST(request: NextRequest) {
         },
       })
     }
+
+    // Sync commands to Telegram
+    await syncCommandsToTelegram()
 
     return NextResponse.json(savedCommand, { status: existingCommand ? 200 : 201 })
   } catch (error: any) {

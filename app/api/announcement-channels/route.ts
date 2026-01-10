@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData, getChat } from '@/lib/telegram'
+import { isSuperAdmin } from '@/lib/auth'
 
 // GET - 获取所有公告群/频道
 export async function GET(request: NextRequest) {
@@ -47,8 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证用户是否为超管
-    const superAdminId = process.env.SUPER_ADMIN_ID
-    if (user.id.toString() !== superAdminId) {
+    if (!isSuperAdmin(user.id.toString())) {
       return NextResponse.json({ error: 'Unauthorized: Only super admin can add announcement channels' }, { status: 403 })
     }
 
