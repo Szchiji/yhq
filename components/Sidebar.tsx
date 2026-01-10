@@ -16,9 +16,12 @@ const getSuperAdminMenuItems = (): MenuItem[] => [
   { name: '首页', href: '/' },
   { name: '抽奖列表', href: '/lottery' },
   { name: '消息模板', href: '/templates' },
-  { name: '公告群/频道', href: '/announcements' },
   { name: '用户管理', href: '/users' },
+  { name: 'VIP套餐管理', href: '/billing/plans' },
+  { name: '订单管理', href: '/billing/orders' },
+  { name: '公告群/频道', href: '/announcements' },
   { name: '私聊命令管理', href: '/commands' },
+  { name: '系统设置', href: '/settings' },
   { name: '管理员管理', href: '/admins' },
 ]
 
@@ -26,6 +29,9 @@ const getAdminMenuItems = (): MenuItem[] => [
   { name: '首页', href: '/' },
   { name: '抽奖列表', href: '/lottery' },
   { name: '消息模板', href: '/templates' },
+  { name: '用户管理', href: '/users' },
+  { name: 'VIP套餐管理', href: '/billing/plans' },
+  { name: '订单管理', href: '/billing/orders' },
 ]
 
 type SidebarProps = {

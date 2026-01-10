@@ -68,19 +68,16 @@ export async function sendMessage(chatId: number | string, text: string, options
 
 // Check if user is admin
 export async function isAdmin(telegramId: string): Promise<boolean> {
-  const superAdminId = process.env.SUPER_ADMIN_ID
-  if (telegramId === superAdminId) return true
-  
-  // Query database for admin list
-  const admin = await prisma.admin.findUnique({
-    where: { telegramId }
-  })
-  return !!admin && admin.isActive
+  // Use centralized auth functions
+  const { isAdmin: checkIsAdmin } = await import('./auth')
+  return checkIsAdmin(telegramId)
 }
 
 // Check if user is super admin
 export function isSuperAdmin(telegramId: string): boolean {
-  return telegramId === process.env.SUPER_ADMIN_ID
+  // Use centralized auth functions
+  const { isSuperAdmin: checkIsSuperAdmin } = require('./auth')
+  return checkIsSuperAdmin(telegramId)
 }
 
 // 回应 callback_query
@@ -293,5 +290,41 @@ export async function getTemplate(type: string, createdBy?: string): Promise<str
     console.error('Error fetching template:', error)
     // Return default template on error
     return getDefaultTemplate(type)
+  }
+}
+
+// Sync commands to Telegram Bot API
+export async function syncCommandsToTelegram() {
+  const botToken = process.env.BOT_TOKEN
+  if (!botToken) {
+    throw new Error('BOT_TOKEN is not set')
+  }
+  
+  try {
+    const commands = await prisma.botCommand.findMany({
+      where: { isEnabled: true },
+      orderBy: { sortOrder: 'asc' }
+    })
+    
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commands: commands.map(cmd => ({
+          command: cmd.command.replace('/', ''),
+          description: cmd.prompt || cmd.description || ''
+        }))
+      })
+    })
+    
+    const result = await response.json()
+    if (!result.ok) {
+      throw new Error(`Failed to sync commands: ${JSON.stringify(result)}`)
+    }
+    
+    return result
+  } catch (error) {
+    console.error('Error syncing commands to Telegram:', error)
+    throw error
   }
 }
