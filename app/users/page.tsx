@@ -18,6 +18,7 @@ type User = {
   participatedCount: number
   wonCount: number
   createdAt: string
+  lastActiveAt: string | null
 }
 
 export default function UsersPage() {
@@ -124,10 +125,21 @@ export default function UsersPage() {
       ),
     },
     { 
-      key: 'createdCount', 
-      label: '创建抽奖',
+      key: 'createdAt', 
+      label: '首次使用',
       render: (user: User) => (
-        <span className="text-xs sm:text-sm">{user.createdCount}</span>
+        <div className="text-xs text-gray-600">
+          {new Date(user.createdAt).toLocaleDateString('zh-CN')}
+        </div>
+      ),
+    },
+    { 
+      key: 'lastActiveAt', 
+      label: '最后活跃',
+      render: (user: User) => (
+        <div className="text-xs text-gray-600">
+          {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleDateString('zh-CN') : '-'}
+        </div>
       ),
     },
     { 
