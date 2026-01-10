@@ -485,7 +485,7 @@ export async function POST(request: NextRequest) {
         }
 
         const { prisma } = await import('@/lib/prisma')
-        const { getSetting } = await import('@/app/api/settings/route')
+        const { getSetting } = await import('@/lib/settings')
         
         // Get user info
         const user = await prisma.user.findUnique({

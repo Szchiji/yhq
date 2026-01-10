@@ -76,7 +76,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     // 检查每日参与限制
-    const { getSetting } = await import('@/app/api/settings/route')
+    const { getSetting } = await import('@/lib/settings')
     const limitEnabled = (await getSetting('lottery_limit_enabled')) === 'true'
     const vipUnlimited = (await getSetting('vip_unlimited')) === 'true'
     
