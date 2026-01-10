@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiGet, apiDelete, apiPost } from '@/lib/api'
+import PublishModal from '@/components/PublishModal'
 
 type Lottery = {
   id: string
@@ -21,6 +22,8 @@ export default function LotteryPage() {
   const [lotteries, setLotteries] = useState<Lottery[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [showPublishModal, setShowPublishModal] = useState(false)
+  const [publishingLotteryId, setPublishingLotteryId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchLotteries()
@@ -96,7 +99,13 @@ export default function LotteryPage() {
 
   // 推送抽奖
   const handlePublish = (id: string) => {
-    router.push(`/lottery/${id}?action=publish`)
+    setPublishingLotteryId(id)
+    setShowPublishModal(true)
+  }
+
+  const closePublishModal = () => {
+    setShowPublishModal(false)
+    setPublishingLotteryId(null)
   }
 
   const statusMap: Record<string, { text: string; color: string }> = {
@@ -275,6 +284,18 @@ export default function LotteryPage() {
           </div>
         )}
       </div>
+
+      {/* Publish Modal */}
+      {showPublishModal && publishingLotteryId && (
+        <PublishModal
+          lotteryId={publishingLotteryId}
+          onClose={closePublishModal}
+          onSuccess={() => {
+            // Optionally refresh the list
+            fetchLotteries()
+          }}
+        />
+      )}
     </div>
   )
 }

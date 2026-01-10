@@ -1,81 +1,144 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import DataTable from '@/components/DataTable'
+import { apiGet, apiPost, apiDelete } from '@/lib/api'
 
-type Announcement = {
-  id: number
-  name: string
+type AnnouncementChannel = {
+  id: string
   chatId: string
-  type: 'group' | 'channel'
-  status: string
+  title: string
+  type: string
+  username: string | null
+  createdAt: string
 }
 
 export default function AnnouncementsPage() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [channels, setChannels] = useState<AnnouncementChannel[]>([])
+  const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [newAnnouncement, setNewAnnouncement] = useState({
-    name: '',
+  const [newChannel, setNewChannel] = useState({
     chatId: '',
-    type: 'channel' as 'group' | 'channel',
   })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetchChannels()
+  }, [])
+
+  const fetchChannels = async () => {
+    try {
+      setLoading(true)
+      const response = await apiGet('/api/announcement-channels')
+      if (response.ok) {
+        const data = await response.json()
+        setChannels(data.data)
+      } else {
+        console.error('Failed to fetch channels')
+      }
+    } catch (error) {
+      console.error('Error fetching channels:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`确定要删除「${title}」吗？`)) {
+      return
+    }
+
+    try {
+      const response = await apiDelete(`/api/announcement-channels/${id}`)
+      if (response.ok) {
+        alert('删除成功')
+        fetchChannels()
+      } else {
+        const error = await response.json()
+        alert(`删除失败：${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error deleting channel:', error)
+      alert('删除失败，请稍后重试')
+    }
+  }
+
+  const addChannel = async () => {
+    if (!newChannel.chatId) {
+      alert('请输入 Chat ID')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiPost('/api/announcement-channels', newChannel)
+      
+      if (response.ok) {
+        alert('添加成功！')
+        setNewChannel({ chatId: '' })
+        setShowAddModal(false)
+        fetchChannels()
+      } else {
+        const error = await response.json()
+        alert(`添加失败：${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error adding channel:', error)
+      alert('添加失败，请稍后重试')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const columns = [
-    { key: 'name', label: '名称' },
-    { key: 'chatId', label: 'Chat ID' },
+    { 
+      key: 'title', 
+      label: '名称',
+      render: (item: AnnouncementChannel) => (
+        <div>
+          <div className="text-xs sm:text-sm font-medium">{item.title}</div>
+          {item.username && <div className="text-xs text-gray-500">@{item.username}</div>}
+        </div>
+      ),
+    },
+    { 
+      key: 'chatId', 
+      label: 'Chat ID',
+      render: (item: AnnouncementChannel) => (
+        <span className="text-xs font-mono">{item.chatId}</span>
+      ),
+    },
     {
       key: 'type',
       label: '类型',
-      render: (item: Announcement) => (
+      render: (item: AnnouncementChannel) => (
         <span className={`px-2 py-0.5 rounded text-xs ${
           item.type === 'channel' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
         }`}>
-          {item.type === 'channel' ? '频道' : '群组'}
+          {item.type === 'channel' ? '频道' : item.type === 'supergroup' ? '超级群组' : '群组'}
         </span>
       ),
     },
     {
-      key: 'status',
-      label: '状态',
-      render: (item: Announcement) => (
-        <span className={`px-2 py-0.5 rounded text-xs ${
-          item.status === '启用' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-        }`}>
-          {item.status}
-        </span>
+      key: 'createdAt',
+      label: '添加时间',
+      render: (item: AnnouncementChannel) => (
+        <span className="text-xs sm:text-sm">{new Date(item.createdAt).toLocaleDateString('zh-CN')}</span>
       ),
     },
     {
       key: 'actions',
       label: '操作',
-      render: (item: Announcement) => (
-        <div className="flex gap-2">
-          <button className="text-blue-500 hover:text-blue-700 text-xs sm:text-sm">编辑</button>
-          <button
-            onClick={() => setAnnouncements(announcements.filter((a) => a.id !== item.id))}
-            className="text-red-500 hover:text-red-700 text-xs sm:text-sm"
-          >
-            删除
-          </button>
-        </div>
+      render: (item: AnnouncementChannel) => (
+        <button
+          onClick={() => handleDelete(item.id, item.title)}
+          className="text-red-500 hover:text-red-700 text-xs sm:text-sm"
+        >
+          删除
+        </button>
       ),
     },
   ]
-
-  const addAnnouncement = () => {
-    if (newAnnouncement.name && newAnnouncement.chatId) {
-      setAnnouncements([
-        ...announcements,
-        {
-          id: Date.now(),
-          ...newAnnouncement,
-          status: '启用',
-        },
-      ])
-      setNewAnnouncement({ name: '', chatId: '', type: 'channel' })
-      setShowAddModal(false)
-    }
-  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -89,13 +152,22 @@ export default function AnnouncementsPage() {
         </button>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-        <p className="text-xs sm:text-sm text-blue-800">
-          在这里设置用于发布抽奖公告的群组或频道。机器人会在抽奖开始和结束时自动发送通知。
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4" role="alert" aria-live="polite">
+        <p className="text-xs sm:text-sm text-yellow-800">
+          💡 在这里设置用于发布抽奖公告的群组或频道。抽奖创建成功后会自动推送到这些群组/频道。
+        </p>
+        <p className="text-xs sm:text-sm text-yellow-800 mt-2 font-medium">
+          ⚠️ 重要：机器人必须是群组/频道的管理员才能添加成功。
         </p>
       </div>
 
-      <DataTable columns={columns} data={announcements} emptyMessage="暂无公告群/频道" />
+      {loading ? (
+        <div className="flex justify-center items-center py-8">
+          <div className="text-gray-500">加载中...</div>
+        </div>
+      ) : (
+        <DataTable columns={columns} data={channels} emptyMessage="暂无公告群/频道" />
+      )}
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -104,54 +176,34 @@ export default function AnnouncementsPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  名称
+                  Chat ID <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={newAnnouncement.name}
-                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, name: e.target.value })}
+                  value={newChannel.chatId}
+                  onChange={(e) => setNewChannel({ ...newChannel, chatId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="例如：抽奖公告频道"
+                  placeholder="例如：-1001234567890"
                 />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  Chat ID
-                </label>
-                <input
-                  type="text"
-                  value={newAnnouncement.chatId}
-                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, chatId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="例如：-100123456789"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  类型
-                </label>
-                <select
-                  value={newAnnouncement.type}
-                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, type: e.target.value as 'group' | 'channel' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value="channel">频道</option>
-                  <option value="group">群组</option>
-                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  请输入群组或频道的 Chat ID（通常以 -100 开头）
+                </p>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                disabled={saving}
+                className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm disabled:opacity-50"
               >
                 取消
               </button>
               <button
-                onClick={addAnnouncement}
-                className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                onClick={addChannel}
+                disabled={saving}
+                className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm disabled:opacity-50"
               >
-                确认
+                {saving ? '添加中...' : '确认'}
               </button>
             </div>
           </div>

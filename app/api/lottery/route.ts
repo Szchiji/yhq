@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
-import { sendCreateSuccessMessage } from '@/lib/lottery'
+import { sendCreateSuccessMessage, autoPushToAnnouncementChannels } from '@/lib/lottery'
 
 // GET - 获取抽奖列表（支持分页和筛选）
 export async function GET(request: NextRequest) {
@@ -145,7 +145,19 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if notification fails
     }
 
-    return NextResponse.json(createdLottery, { status: 201 })
+    // 自动推送到所有公告群/频道
+    let pushResults: Array<{ chatId: string; title: string; success: boolean; error?: string }> = []
+    try {
+      pushResults = await autoPushToAnnouncementChannels(createdLottery.id, user.id.toString())
+    } catch (error) {
+      console.error('Failed to auto-push to announcement channels:', error)
+      // Don't fail the request if auto-push fails
+    }
+
+    return NextResponse.json({
+      lottery: createdLottery,
+      pushResults,
+    }, { status: 201 })
   } catch (error) {
     console.error('Error creating lottery:', error)
     return NextResponse.json({ error: 'Failed to create lottery' }, { status: 500 })

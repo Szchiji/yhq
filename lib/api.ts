@@ -54,3 +54,11 @@ export async function apiPut(url: string, data?: any) {
 export async function apiDelete(url: string) {
   return apiRequest(url, { method: 'DELETE' })
 }
+
+// PATCH 请求
+export async function apiPatch(url: string, data?: any) {
+  return apiRequest(url, {
+    method: 'PATCH',
+    body: data ? JSON.stringify(data) : undefined,
+  })
+}

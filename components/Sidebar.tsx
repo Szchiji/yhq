@@ -11,29 +11,21 @@ type MenuItem = {
   children?: MenuItem[]
 }
 
-const menuItems: MenuItem[] = [
-  { name: '抽奖消息模板', href: '/templates' },
-  { name: '公告群/频道设置', href: '/announcements' },
-  { name: '已加入的群/频道', href: '/groups' },
-  { name: '强制加入群/频道', href: '/forced-join' },
-  { name: '抽奖管理', href: '/lottery' },
-  { name: '抽奖用户管理', href: '/users' },
-  {
-    name: '定时发送',
-    children: [
-      { name: '私聊定时发送', href: '/scheduled/private' },
-      { name: '私聊命令管理', href: '/scheduled/commands' },
-    ],
-  },
-  { name: '管理员设置', href: '/admins' },
-  {
-    name: '收费管理',
-    children: [
-      { name: '收款地址管理', href: '/billing/address' },
-      { name: '续费规则管理', href: '/billing/rules' },
-      { name: '收费设置', href: '/billing/settings' },
-    ],
-  },
+// Menu items configuration - filtered based on user role
+const getSuperAdminMenuItems = (): MenuItem[] => [
+  { name: '首页', href: '/' },
+  { name: '抽奖列表', href: '/lottery' },
+  { name: '消息模板', href: '/templates' },
+  { name: '公告群/频道', href: '/announcements' },
+  { name: '用户管理', href: '/users' },
+  { name: '私聊命令管理', href: '/commands' },
+  { name: '管理员管理', href: '/admins' },
+]
+
+const getAdminMenuItems = (): MenuItem[] => [
+  { name: '首页', href: '/' },
+  { name: '抽奖列表', href: '/lottery' },
+  { name: '消息模板', href: '/templates' },
 ]
 
 type SidebarProps = {
@@ -43,8 +35,11 @@ type SidebarProps = {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['定时发送', '收费管理'])
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([])
   const { user, isSuperAdmin } = useTelegramWebApp()
+
+  // Get menu items based on user role
+  const menuItems = isSuperAdmin ? getSuperAdminMenuItems() : getAdminMenuItems()
 
   const toggleMenu = (menuName: string) => {
     setExpandedMenus((prev) =>

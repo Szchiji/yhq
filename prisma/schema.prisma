@@ -19,13 +19,17 @@ model Admin {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  telegramId  String   @unique
-  username    String?
-  firstName   String?
-  lastName    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String    @id @default(cuid())
+  telegramId        String    @unique
+  username          String?
+  firstName         String?
+  lastName          String?
+  isVip             Boolean   @default(false)
+  vipExpireAt       DateTime?
+  canCreateLottery  Boolean   @default(true)
+  canJoinLottery    Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 // 抽奖活动
@@ -149,6 +153,29 @@ model Template {
   content     String
   buttons     Json?    // 按钮配置 [{text: string, url: string}]
   createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 公告群/频道
+model AnnouncementChannel {
+  id        String   @id @default(cuid())
+  chatId    String   @unique
+  title     String
+  type      String   // group, supergroup, channel
+  username  String?
+  createdAt DateTime @default(now())
+  createdBy String   // 超管ID
+}
+
+// 私聊命令
+model BotCommand {
+  id          String   @id @default(cuid())
+  command     String   @unique  // /start, /new, /create 等
+  prompt      String             // 命令提示，如"开始"
+  description String?            // 功能描述
+  sortOrder   Int      @default(0)
+  isEnabled   Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

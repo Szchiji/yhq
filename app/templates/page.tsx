@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/RichTextEditor'
+import ButtonEditor, { ButtonLayout } from '@/components/ButtonEditor'
 import { apiGet, apiPost } from '@/lib/api'
 import { TEMPLATE_PLACEHOLDERS, getDefaultTemplate } from '@/lib/placeholders'
 
@@ -20,7 +21,7 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editorContent, setEditorContent] = useState('')
-  const [buttons, setButtons] = useState<Array<{ text: string; url: string }>>([])
+  const [buttons, setButtons] = useState<ButtonLayout>([])
 
   useEffect(() => {
     fetchTemplates()
@@ -60,24 +61,6 @@ export default function TemplatesPage() {
 
   const getDefaultContent = (type: string) => {
     return getDefaultTemplate(type)
-  }
-
-  const addButton = () => {
-    setButtons([...buttons, { text: '', url: '' }])
-  }
-
-  const addRow = () => {
-    setButtons([...buttons, { text: '', url: '' }])
-  }
-
-  const updateButton = (index: number, field: 'text' | 'url', value: string) => {
-    const newButtons = [...buttons]
-    newButtons[index][field] = value
-    setButtons(newButtons)
-  }
-
-  const deleteButton = (index: number) => {
-    setButtons(buttons.filter((_, i) => i !== index))
   }
 
   const handleSave = async () => {
@@ -147,66 +130,7 @@ export default function TemplatesPage() {
           />
 
           {/* Button Configuration */}
-          <div className="space-y-3 sm:space-y-4">
-            <h3 className="font-medium text-gray-800 text-sm sm:text-base">附加按钮配置</h3>
-            
-            {buttons.map((button, index) => (
-              <div key={index} className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
-                <input
-                  type="text"
-                  value={button.text}
-                  onChange={(e) => updateButton(index, 'text', e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="按钮文字"
-                />
-                <input
-                  type="text"
-                  value={button.url}
-                  onChange={(e) => updateButton(index, 'url', e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="按钮链接"
-                />
-                <button
-                  onClick={() => deleteButton(index)}
-                  className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors text-sm self-start sm:self-auto"
-                >
-                  删除
-                </button>
-              </div>
-            ))}
-            
-            <div className="flex flex-wrap gap-2 sm:gap-3">
-              <button 
-                onClick={addButton}
-                className="px-3 py-1.5 sm:py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-xs sm:text-sm"
-              >
-                + 添加新按钮
-              </button>
-              <button 
-                onClick={addRow}
-                className="px-3 py-1.5 sm:py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-xs sm:text-sm"
-              >
-                + 添加新行
-              </button>
-            </div>
-          </div>
-
-          {/* Button Preview */}
-          {buttons.some(b => b.text) && (
-            <div className="space-y-3 sm:space-y-4">
-              <h3 className="font-medium text-gray-800 text-sm sm:text-base">按钮预览：</h3>
-              <div className="flex flex-wrap gap-2 sm:gap-3">
-                {buttons.filter(b => b.text).map((button, index) => (
-                  <button
-                    key={index}
-                    className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors text-xs sm:text-sm"
-                  >
-                    {button.text}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <ButtonEditor buttons={buttons} onChange={setButtons} />
 
           {/* Submit Button */}
           <div className="flex justify-end pt-3 sm:pt-4 border-t border-gray-200">
