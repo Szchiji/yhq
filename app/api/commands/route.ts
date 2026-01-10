@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData, syncCommandsToTelegram } from '@/lib/telegram'
-import { isSuperAdmin } from '@/lib/auth'
+import { isSuperAdmin, isAdmin } from '@/lib/auth'
 
 // Default commands to initialize
 const DEFAULT_COMMANDS = [
@@ -103,9 +103,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid user data' }, { status: 401 })
     }
 
-    // 验证用户是否为超管
-    if (!isSuperAdmin(user.id.toString())) {
-      return NextResponse.json({ error: 'Unauthorized: Only super admin can manage commands' }, { status: 403 })
+    // 检查是否是管理员或超级管理员
+    const userId = user.id.toString()
+    const userIsAdmin = await isAdmin(userId)
+    const userIsSuperAdmin = isSuperAdmin(userId)
+
+    if (!userIsAdmin && !userIsSuperAdmin) {
+      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 })
     }
 
     // 验证必需字段

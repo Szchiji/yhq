@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
+import { isSuperAdmin, isAdmin } from '@/lib/auth'
 
 // DELETE - 删除命令
 export async function DELETE(
@@ -32,10 +33,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid user data' }, { status: 401 })
     }
 
-    // 验证用户是否为超管
-    const superAdminId = process.env.SUPER_ADMIN_ID
-    if (user.id.toString() !== superAdminId) {
-      return NextResponse.json({ error: 'Unauthorized: Only super admin can delete commands' }, { status: 403 })
+    // 检查是否是管理员或超级管理员
+    const userId = user.id.toString()
+    const userIsAdmin = await isAdmin(userId)
+    const userIsSuperAdmin = isSuperAdmin(userId)
+
+    if (!userIsAdmin && !userIsSuperAdmin) {
+      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 })
     }
 
     // 删除命令记录
