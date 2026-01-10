@@ -7,6 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 用户角色枚举
+enum UserRole {
+  USER          // 普通用户
+  VIP           // VIP用户
+  ADMIN         // 管理员
+  SUPER_ADMIN   // 超级管理员
+}
+
 model Admin {
   id          String   @id @default(cuid())
   telegramId  String   @unique
@@ -24,14 +32,145 @@ model User {
   username          String?
   firstName         String?
   lastName          String?
+  role              UserRole  @default(USER)
+  
+  // 付费状态
+  isPaid            Boolean   @default(false)
+  paidExpireAt      DateTime?
+  
+  // VIP状态（用于VIP角色）
   isVip             Boolean   @default(false)
   vipExpireAt       DateTime?
-  canCreateLottery  Boolean   @default(true)
-  canJoinLottery    Boolean   @default(true)
+  
+  // 管理员状态（用于管理员角色）
+  isAdmin           Boolean   @default(false)
+  adminExpireAt     DateTime?
+  
+  // 限制
+  canCreateLottery  Boolean   @default(false)
+  canJoinLottery    Boolean   @default(false)
   dailyJoinCount    Int       @default(0)
   dailyJoinResetAt  DateTime?
+  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+  
+  // 关联
+  groups            UserGroup[]
+  forcedJoins       ForcedJoinChannel[]
+  scheduledMessages ScheduledMessage[]
+  paymentAddresses  PaymentAddress[]
+}
+
+// 已加入的群/频道
+model UserGroup {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId      String
+  title       String
+  type        String   // group, supergroup, channel
+  username    String?
+  memberCount Int      @default(0)
+  status      String   @default("active") // active, left, kicked
+  joinedAt    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, chatId])
+}
+
+// 强制加入群/频道
+model ForcedJoinChannel {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId      String
+  title       String
+  type        String   // group, channel
+  username    String?
+  inviteLink  String?
+  isRequired  Boolean  @default(true)
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, chatId])
+}
+
+// 定时发送消息
+model ScheduledMessage {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  content     String
+  mediaType   String   @default("none") // none, image, video
+  mediaUrl    String?
+  targetType  String   // private, group, channel
+  targetChatId String?
+  scheduledAt DateTime
+  repeatType  String   @default("once") // once, daily, weekly, monthly
+  status      String   @default("pending") // pending, sent, failed, cancelled
+  sentAt      DateTime?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 收款地址
+model PaymentAddress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String   // 地址名称，如"USDT-TRC20"
+  network     String   // 网络类型：TRC20, ERC20, BEP20等
+  address     String   // 收款地址
+  qrCodeUrl   String?  // 二维码图片URL
+  isDefault   Boolean  @default(false)
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 续费规则
+model RenewalRule {
+  id          String   @id @default(cuid())
+  name        String
+  targetRole  String   // user, vip, admin
+  days        Int      // -1表示永久
+  price       Decimal  @db.Decimal(10, 2)
+  currency    String   @default("USDT")
+  description String?
+  isEnabled   Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 收费设置
+model BillingSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+// 付费订单（统一所有角色的付费）
+model PaymentOrder {
+  id          String    @id @default(cuid())
+  orderNo     String    @unique
+  telegramId  String
+  orderType   String    // user_renewal, vip_purchase, admin_purchase
+  ruleId      String?   // 关联的规则ID
+  amount      Decimal   @db.Decimal(10, 2)
+  currency    String
+  status      String    @default("pending") // pending, paid, cancelled, expired
+  expireAt    DateTime? // 订单过期时间
+  paidAt      DateTime?
+  remark      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 // 抽奖活动

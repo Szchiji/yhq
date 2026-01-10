@@ -24,7 +24,14 @@ const getSuperAdminMenuItems = (): MenuItem[] => [
   { name: '私聊命令管理', href: '/commands' },
   { name: 'VIP套餐管理', href: '/vip-plans' },
   { name: '订单管理', href: '/orders' },
-  { name: '收费管理', href: '/billing' },
+  { 
+    name: '收费管理', 
+    children: [
+      { name: '收款地址管理', href: '/billing/address' },
+      { name: '续费规则管理', href: '/billing/rules' },
+      { name: '收费设置', href: '/billing/settings' },
+    ]
+  },
   { name: '管理员管理', href: '/admins' },
   { name: '系统设置', href: '/settings' },
 ]
@@ -37,6 +44,7 @@ const getAdminMenuItems = (): MenuItem[] => [
   { name: '强制加入群/频道', href: '/forced-join' },
   { name: '用户管理', href: '/users' },
   { name: '定时发送', href: '/scheduled' },
+  { name: '私聊命令管理', href: '/commands' },
   { name: 'VIP套餐管理', href: '/vip-plans' },
   { name: '订单管理', href: '/orders' },
 ]

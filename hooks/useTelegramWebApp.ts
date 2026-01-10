@@ -16,6 +16,7 @@ interface WebAppData {
   isReady: boolean
   isSuperAdmin: boolean
   isAdmin: boolean
+  role?: 'USER' | 'VIP' | 'ADMIN' | 'SUPER_ADMIN'
 }
 
 export function useTelegramWebApp() {
@@ -25,6 +26,7 @@ export function useTelegramWebApp() {
     isReady: false,
     isSuperAdmin: false,
     isAdmin: false,
+    role: undefined,
   })
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export function useTelegramWebApp() {
                 isReady: true,
                 isSuperAdmin: result.isSuperAdmin,
                 isAdmin: result.isAdmin,
+                role: result.role,
               })
             }
           })
