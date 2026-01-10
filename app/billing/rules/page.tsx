@@ -279,17 +279,17 @@ export default function BillingRulesPage() {
               </div>
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  时长（天）*（-1表示永久）
+                  时长（天，-1表示永久）*
                 </label>
                 <input
                   type="number"
                   value={newRule.days}
                   onChange={(e) => {
                     const val = parseInt(e.target.value, 10)
-                    setNewRule({ ...newRule, days: isNaN(val) ? 1 : val })
+                    setNewRule({ ...newRule, days: val })
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="30"
+                  placeholder="30（输入 -1 表示永久）"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">

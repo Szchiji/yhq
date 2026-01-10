@@ -170,7 +170,7 @@ export default function ScheduledPage() {
       mediaUrl: message.mediaUrl || '',
       targetType: message.targetType,
       targetChatId: message.targetChatId || '',
-      scheduledAt: message.scheduledAt.substring(0, 16),
+      scheduledAt: new Date(message.scheduledAt).toISOString().substring(0, 16),
       repeatType: message.repeatType,
     })
     setShowAddModal(true)
