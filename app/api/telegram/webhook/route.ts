@@ -429,6 +429,83 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
+      // Handle /vip command - view VIP status and plans
+      if (text.startsWith('/vip')) {
+        if (!userId) {
+          await sendMessage(chatId, '⛔ 无法识别用户身份')
+          return NextResponse.json({ ok: true })
+        }
+
+        try {
+          // Get user VIP status
+          const user = await prisma.user.findUnique({
+            where: { telegramId: userId }
+          })
+
+          const isVip = user?.isVip || false
+          const vipExpireAt = user?.vipExpireAt
+          
+          // Get VIP plans
+          const plans = await prisma.vipPlan.findMany({
+            where: { isEnabled: true },
+            orderBy: { sortOrder: 'asc' }
+          })
+
+          // Build message
+          let message = '💎 VIP会员中心\n\n'
+          
+          if (isVip) {
+            if (vipExpireAt) {
+              const daysLeft = Math.ceil((new Date(vipExpireAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+              message += `当前状态：✅ VIP会员\n到期时间：${new Date(vipExpireAt).toLocaleDateString('zh-CN')}\n剩余天数：${daysLeft}天\n\n`
+            } else {
+              message += '当前状态：✅ 永久VIP会员\n\n'
+            }
+          } else {
+            message += '当前状态：普通用户\n\n'
+            
+            // Check daily limit
+            const settings = await prisma.systemSetting.findMany({
+              where: { key: { in: ['lottery_limit_enabled', 'lottery_daily_limit'] } }
+            })
+            const limitEnabled = settings.find(s => s.key === 'lottery_limit_enabled')?.value === 'true'
+            const dailyLimit = parseInt(settings.find(s => s.key === 'lottery_daily_limit')?.value || '3')
+            
+            if (limitEnabled) {
+              const dailyJoinCount = user?.dailyJoinCount || 0
+              const remaining = Math.max(0, dailyLimit - dailyJoinCount)
+              message += `今日剩余参与次数：${remaining}/${dailyLimit}\n\n`
+            }
+          }
+
+          message += '✨ VIP权益：\n'
+          message += '• 无限创建抽奖\n'
+          message += '• 无限参与抽奖\n'
+          message += '• 推送到群/频道\n\n'
+
+          // Build inline keyboard with plans
+          const keyboard: any[][] = []
+          
+          for (const plan of plans) {
+            const daysText = plan.days === -1 ? '永久' : `${plan.days}天`
+            keyboard.push([{
+              text: `🛒 ${plan.name} - ${plan.price} ${plan.currency} (${daysText})`,
+              url: `${getWebAppUrl()}/billing/plans`  // Link to VIP management page
+            }])
+          }
+
+          await sendMessage(chatId, message, {
+            reply_markup: {
+              inline_keyboard: keyboard
+            }
+          })
+        } catch (error) {
+          console.error('Error in /vip command:', error)
+          await sendMessage(chatId, '获取VIP信息失败，请稍后重试')
+        }
+        return NextResponse.json({ ok: true })
+      }
+
       // Handle /help command
       if (text === '/help') {
         await sendMessage(chatId, '📖 使用帮助\n\n/bot - 打开管理后台\n/new - 创建新抽奖\n/mylottery - 查看我的抽奖\n\n如需帮助，请联系管理员。')

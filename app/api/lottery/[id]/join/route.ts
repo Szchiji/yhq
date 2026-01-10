@@ -19,6 +19,58 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Missing telegramId' }, { status: 400 })
     }
 
+    // Check participation limits
+    const user = await prisma.user.findUnique({
+      where: { telegramId }
+    })
+
+    // Check if user can participate based on VIP status and daily limits
+    const settings = await prisma.systemSetting.findMany({
+      where: { key: { in: ['lottery_limit_enabled', 'lottery_daily_limit', 'vip_unlimited'] } }
+    })
+    
+    const limitEnabled = settings.find(s => s.key === 'lottery_limit_enabled')?.value === 'true'
+    const dailyLimit = parseInt(settings.find(s => s.key === 'lottery_daily_limit')?.value || '3')
+    const vipUnlimited = settings.find(s => s.key === 'vip_unlimited')?.value !== 'false'
+
+    if (limitEnabled) {
+      const isVip = user?.isVip || false
+      const vipExpireAt = user?.vipExpireAt
+      const vipValid = isVip && (!vipExpireAt || new Date(vipExpireAt) > new Date())
+
+      // Check if VIP users are unlimited
+      if (!vipValid || !vipUnlimited) {
+        // Check daily limit for non-VIP or if VIP unlimited is disabled
+        if (!vipValid) {
+          const dailyJoinCount = user?.dailyJoinCount || 0
+          const dailyJoinResetAt = user?.dailyJoinResetAt
+          
+          // Reset count if it's a new day
+          const now = new Date()
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          const shouldReset = !dailyJoinResetAt || new Date(dailyJoinResetAt) < today
+
+          if (shouldReset) {
+            // Reset the count
+            if (user) {
+              await prisma.user.update({
+                where: { telegramId },
+                data: { 
+                  dailyJoinCount: 0,
+                  dailyJoinResetAt: now
+                }
+              })
+            }
+          } else if (dailyJoinCount >= dailyLimit) {
+            return NextResponse.json({ 
+              error: 'Daily limit exceeded',
+              message: `您今日的参与次数已用完（${dailyLimit}次/天）。升级VIP可无限参与！`
+            }, { status: 400 })
+          }
+        }
+      }
+    }
+
     // 获取抽奖信息
     const lottery = await prisma.lottery.findUnique({
       where: { id: params.id },
@@ -100,6 +152,39 @@ export async function POST(request: NextRequest, { params }: Params) {
           },
         },
       })
+    }
+
+    // Increment daily join count if limit is enabled
+    if (limitEnabled) {
+      const isVip = user?.isVip || false
+      const vipExpireAt = user?.vipExpireAt
+      const vipValid = isVip && (!vipExpireAt || new Date(vipExpireAt) > new Date())
+
+      // Only increment for non-VIP users or if VIP unlimited is disabled
+      if (!vipValid || !vipUnlimited) {
+        if (!vipValid) {
+          // Update or create user record with incremented count
+          if (user) {
+            await prisma.user.update({
+              where: { telegramId },
+              data: { 
+                dailyJoinCount: { increment: 1 }
+              }
+            })
+          } else {
+            await prisma.user.create({
+              data: {
+                telegramId,
+                username,
+                firstName,
+                lastName,
+                dailyJoinCount: 1,
+                dailyJoinResetAt: new Date()
+              }
+            })
+          }
+        }
+      }
     }
 
     // 检查是否触发人满开奖
