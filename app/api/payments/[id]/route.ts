@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
 import { isAdmin, isSuperAdmin } from '@/lib/auth'
 
+// Permanent subscription expiry date
+const PERMANENT_EXPIRY = new Date('2099-12-31T23:59:59Z')
+
 // PUT - 确认付款
 export async function PUT(
   request: NextRequest,
@@ -79,8 +82,8 @@ export async function PUT(
           })
           if (rule) {
             if (rule.days === -1) {
-              // Permanent
-              expiryDate = new Date('2099-12-31')
+              // Permanent subscription
+              expiryDate = new Date(PERMANENT_EXPIRY)
             } else {
               expiryDate.setDate(expiryDate.getDate() + rule.days)
             }
