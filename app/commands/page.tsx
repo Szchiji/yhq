@@ -26,6 +26,7 @@ export default function CommandsPage() {
     sortOrder: 0,
   })
   const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     fetchCommands()
@@ -147,6 +148,26 @@ export default function CommandsPage() {
     }
   }
 
+  const handleSyncToTelegram = async () => {
+    if (!confirm('确认同步命令到 Telegram？')) return
+    
+    try {
+      setSyncing(true)
+      const response = await apiPost('/api/commands/sync', {})
+      if (response.ok) {
+        alert('命令已成功同步到 Telegram')
+      } else {
+        const error = await response.json()
+        alert(error.error || '同步失败')
+      }
+    } catch (error) {
+      console.error('Error syncing commands:', error)
+      alert('同步失败，请稍后重试')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const columns = [
     { 
       key: 'command', 
@@ -228,12 +249,21 @@ export default function CommandsPage() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">私聊命令管理</h1>
-        <button
-          onClick={openAddModal}
-          className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-xs sm:text-sm"
-        >
-          + 新增自定义命令
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSyncToTelegram}
+            disabled={syncing}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-xs sm:text-sm disabled:opacity-50"
+          >
+            {syncing ? '同步中...' : '🔄 同步到 Telegram'}
+          </button>
+          <button
+            onClick={openAddModal}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-xs sm:text-sm"
+          >
+            + 新增自定义命令
+          </button>
+        </div>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
