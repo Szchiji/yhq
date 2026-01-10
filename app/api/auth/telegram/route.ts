@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     // Save or update user in database
     const { prisma } = await import('@/lib/prisma')
-    await prisma.user.upsert({
+    const dbUser = await prisma.user.upsert({
       where: { telegramId },
       update: {
         username: user.username,
@@ -64,6 +64,21 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Determine role
+    let role: 'USER' | 'VIP' | 'ADMIN' | 'SUPER_ADMIN' = dbUser.role || 'USER'
+    
+    // Override with actual super admin check
+    if (userIsSuperAdmin) {
+      role = 'SUPER_ADMIN'
+      // Update role in database if not already set
+      if (dbUser.role !== 'SUPER_ADMIN') {
+        await prisma.user.update({
+          where: { id: dbUser.id },
+          data: { role: 'SUPER_ADMIN' }
+        })
+      }
+    }
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -73,6 +88,7 @@ export async function POST(request: NextRequest) {
       },
       isSuperAdmin: userIsSuperAdmin,
       isAdmin: userIsAdmin || userIsSuperAdmin,
+      role: role,
     })
   } catch (error) {
     console.error('Authentication error:', error)
