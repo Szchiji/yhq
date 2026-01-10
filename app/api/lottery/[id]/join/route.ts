@@ -75,6 +75,71 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
 
+    // 检查每日参与限制
+    const { getSetting } = await import('@/app/api/settings/route')
+    const limitEnabled = (await getSetting('lottery_limit_enabled')) === 'true'
+    const vipUnlimited = (await getSetting('vip_unlimited')) === 'true'
+    
+    if (limitEnabled) {
+      // Get or create user
+      let user = await prisma.user.findUnique({
+        where: { telegramId }
+      })
+      
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            telegramId,
+            username,
+            firstName,
+            lastName,
+          }
+        })
+      }
+      
+      // Check if VIP and unlimited
+      const isVip = user.isVip && user.vipExpireAt && new Date(user.vipExpireAt) > new Date()
+      const canBypassLimit = isVip && vipUnlimited
+      
+      if (!canBypassLimit) {
+        const dailyLimit = parseInt((await getSetting('lottery_daily_limit')) || '3')
+        
+        // Reset count if needed (new day)
+        const now = new Date()
+        const resetAt = user.dailyJoinResetAt
+        const needsReset = !resetAt || resetAt < new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        
+        if (needsReset) {
+          await prisma.user.update({
+            where: { telegramId },
+            data: {
+              dailyJoinCount: 0,
+              dailyJoinResetAt: new Date(now.getFullYear(), now.getMonth(), now.getDate())
+            }
+          })
+          user.dailyJoinCount = 0
+        }
+        
+        // Check limit
+        if (user.dailyJoinCount >= dailyLimit) {
+          return NextResponse.json({ 
+            error: 'Daily limit reached',
+            message: `您今天的参与次数已达上限 (${dailyLimit}次)。明天再来吧！`
+          }, { status: 400 })
+        }
+        
+        // Increment count
+        await prisma.user.update({
+          where: { telegramId },
+          data: {
+            dailyJoinCount: {
+              increment: 1
+            }
+          }
+        })
+      }
+    }
+
     // 创建参与记录
     const participant = await prisma.participant.create({
       data: {

@@ -91,6 +91,54 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
+      // Handle VIP plan selection
+      if (data.startsWith('vip_plan_')) {
+        const planId = data.replace('vip_plan_', '')
+        
+        try {
+          const plan = await prisma.vipPlan.findUnique({
+            where: { id: planId }
+          })
+          
+          if (!plan || !plan.isEnabled) {
+            await answerCallbackQuery(callbackQuery.id, '该套餐已下架')
+            return NextResponse.json({ ok: true })
+          }
+          
+          // Create order
+          const orderNo = `VIP${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+          
+          const order = await prisma.vipOrder.create({
+            data: {
+              orderNo,
+              telegramId: userId,
+              planId: plan.id,
+              amount: plan.price,
+              currency: plan.currency,
+              status: 'pending',
+              createdBy: userId,
+            }
+          })
+          
+          await answerCallbackQuery(callbackQuery.id, '订单已创建')
+          
+          let message = `📋 VIP订单详情\n\n`
+          message += `订单号：${order.orderNo}\n`
+          message += `套餐：${plan.name}\n`
+          message += `时长：${plan.days === -1 ? '永久' : `${plan.days}天`}\n`
+          message += `金额：${plan.price} ${plan.currency}\n\n`
+          message += `💰 请联系管理员完成支付并激活VIP。\n`
+          message += `请提供订单号：${order.orderNo}`
+          
+          await sendMessage(chatId, message)
+        } catch (error) {
+          console.error('Error creating VIP order:', error)
+          await answerCallbackQuery(callbackQuery.id, '创建订单失败')
+          await sendMessage(chatId, '创建订单失败，请稍后重试')
+        }
+        return NextResponse.json({ ok: true })
+      }
+
       // 推送到单个群组
       if (data.startsWith('publish_') && !data.startsWith('publish_all_')) {
         const parts = data.split('_')
@@ -426,6 +474,79 @@ export async function POST(request: NextRequest) {
             ]]
           }
         })
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle /vip command - VIP membership
+      if (text.startsWith('/vip')) {
+        if (!userId) {
+          await sendMessage(chatId, '⛔ 无法识别用户身份')
+          return NextResponse.json({ ok: true })
+        }
+
+        const { prisma } = await import('@/lib/prisma')
+        const { getSetting } = await import('@/app/api/settings/route')
+        
+        // Get user info
+        const user = await prisma.user.findUnique({
+          where: { telegramId: userId }
+        })
+        
+        const isVip = user?.isVip || false
+        const vipExpireAt = user?.vipExpireAt
+        
+        // Get system settings
+        const limitEnabled = (await getSetting('lottery_limit_enabled')) === 'true'
+        const dailyLimit = parseInt((await getSetting('lottery_daily_limit')) || '3')
+        const dailyJoinCount = user?.dailyJoinCount || 0
+        
+        // Build message
+        let message = '💎 VIP会员中心\n\n'
+        
+        if (isVip) {
+          message += '当前状态：✨ VIP会员\n'
+          if (vipExpireAt) {
+            const expireDate = new Date(vipExpireAt)
+            if (expireDate.getFullYear() === 2099) {
+              message += 'VIP到期：永久\n'
+            } else {
+              message += `VIP到期：${expireDate.toLocaleDateString('zh-CN')}\n`
+            }
+          }
+        } else {
+          message += '当前状态：普通用户\n'
+        }
+        
+        if (limitEnabled && !isVip) {
+          message += `\n今日剩余参与次数：${Math.max(0, dailyLimit - dailyJoinCount)}/${dailyLimit}\n`
+        }
+        
+        message += '\n✨ VIP权益：\n'
+        message += '• 无限创建抽奖\n'
+        message += '• 无限参与抽奖\n'
+        message += '• 推送到群/频道\n'
+        
+        // Get enabled VIP plans
+        const plans = await prisma.vipPlan.findMany({
+          where: { isEnabled: true },
+          orderBy: { sortOrder: 'asc' }
+        })
+        
+        if (plans.length > 0) {
+          const buttons = plans.map(plan => [{
+            text: `🛒 ${plan.name} ${plan.price} ${plan.currency}`,
+            callback_data: `vip_plan_${plan.id}`
+          }])
+          
+          await sendMessage(chatId, message, {
+            reply_markup: {
+              inline_keyboard: buttons
+            }
+          })
+        } else {
+          await sendMessage(chatId, message + '\n\n暂无可用的VIP套餐')
+        }
+        
         return NextResponse.json({ ok: true })
       }
 
