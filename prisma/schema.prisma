@@ -364,3 +364,26 @@ model VipOrder {
   createdAt  DateTime  @default(now())
   createdBy  String
 }
+
+// 提醒设置
+model ReminderSetting {
+  id              String   @id @default(cuid())
+  isEnabled       Boolean  @default(true)
+  reminderDays    String   @default("7,3,1") // 逗号分隔的天数
+  vipTemplate     String?  // VIP 过期提醒模板
+  adminTemplate   String?  // 管理员过期提醒模板
+  userTemplate    String?  // 普通用户过期提醒模板
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// 提醒记录（防止重复发送）
+model ReminderLog {
+  id          String   @id @default(cuid())
+  telegramId  String
+  type        String   // vip / admin / user
+  daysLeft    Int      // 剩余天数
+  sentAt      DateTime @default(now())
+  
+  @@unique([telegramId, type, daysLeft])
+}
