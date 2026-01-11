@@ -197,14 +197,25 @@ export async function POST(request: NextRequest) {
         const lotteryId = data.replace('push_lottery_', '')
         
         try {
-          // 获取所有公告群/频道
-          const channels = await prisma.announcementChannel.findMany({
-            orderBy: { createdAt: 'desc' }
+          // 获取该抽奖的参与条件群/频道
+          const lottery = await prisma.lottery.findUnique({
+            where: { id: lotteryId },
+            include: {
+              channels: true
+            }
           })
           
+          if (!lottery) {
+            await answerCallbackQuery(callbackQuery.id, '抽奖不存在')
+            await sendMessage(chatId, '⚠️ 抽奖不存在或已被删除')
+            return NextResponse.json({ ok: true })
+          }
+          
+          const channels = lottery.channels || []
+          
           if (channels.length === 0) {
-            await answerCallbackQuery(callbackQuery.id, '暂无可推送的群组/频道')
-            await sendMessage(chatId, '⚠️ 暂无配置的公告群/频道\n\n请先在管理后台添加公告群/频道。')
+            await answerCallbackQuery(callbackQuery.id, '该抽奖无参与条件群/频道')
+            await sendMessage(chatId, '⚠️ 该抽奖没有设置参与条件群/频道\n\n无法推送到参与条件群。')
             return NextResponse.json({ ok: true })
           }
           
@@ -216,12 +227,12 @@ export async function POST(request: NextRequest) {
           
           // 添加"推送到全部"按钮
           buttons.push([{
-            text: '🔔 推送到全部群组',
+            text: '🔔 推送到全部参与条件群',
             callback_data: `publish_all_${lotteryId}`
           }])
           
           await answerCallbackQuery(callbackQuery.id)
-          await sendMessage(chatId, '请选择要推送的群组/频道：', {
+          await sendMessage(chatId, '请选择要推送的参与条件群/频道：', {
             reply_markup: {
               inline_keyboard: buttons
             }
@@ -385,10 +396,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: true })
           }
           
+          // 使用参与条件群/频道
+          const channels = lottery.channels || []
+          
+          if (channels.length === 0) {
+            await answerCallbackQuery(callbackQuery.id, '该抽奖无参与条件群/频道')
+            await sendMessage(chatId, '⚠️ 该抽奖没有设置参与条件群/频道')
+            return NextResponse.json({ ok: true })
+          }
+          
           // 检查是否有已推送的
           if (!force && lottery.publishes.length > 0) {
             const chatNames = lottery.publishes.map(p => p.chatTitle || p.chatId).join('、')
-            await sendMessage(chatId, `⚠️ 该抽奖已推送到以下群组：\n${chatNames}\n\n确定要再次推送到所有群组吗？`, {
+            await sendMessage(chatId, `⚠️ 该抽奖已推送到以下群组：\n${chatNames}\n\n确定要再次推送到所有参与条件群吗？`, {
               reply_markup: {
                 inline_keyboard: [[
                   { text: '✅ 全部重新推送', callback_data: `publish_all_${lotteryId}_force` },
@@ -400,9 +420,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: true })
           }
           
-          // 推送到所有群组
+          // 推送到所有参与条件群
           let successCount = 0
-          const channels = lottery.channels || []
           for (const channel of channels) {
             try {
               await publishLottery(lotteryId, channel.chatId, userId)
@@ -413,7 +432,7 @@ export async function POST(request: NextRequest) {
           }
           
           await answerCallbackQuery(callbackQuery.id, `✅ 已推送到 ${successCount} 个群组`)
-          await sendMessage(chatId, `✅ 成功推送到 ${successCount}/${channels.length} 个群组`)
+          await sendMessage(chatId, `✅ 成功推送到 ${successCount}/${channels.length} 个参与条件群`)
         } catch (error) {
           console.error('Error in publish all:', error)
           await answerCallbackQuery(callbackQuery.id, '推送失败')

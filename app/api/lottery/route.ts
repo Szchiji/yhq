@@ -122,14 +122,6 @@ export async function POST(request: NextRequest) {
             remaining: prize.total,
           })),
         },
-        channels: {
-          create: (lottery.channels || []).map((channel: any) => ({
-            chatId: channel.chatId,
-            title: channel.title,
-            type: channel.type,
-            username: channel.username,
-          })),
-        },
       },
       include: {
         prizes: true,
@@ -137,9 +129,66 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // 添加参与条件群/频道（自动获取邀请链接）
+    const { getChannelFullInfo } = await import('@/lib/telegram')
+    if (lottery.channels && lottery.channels.length > 0) {
+      for (const channel of lottery.channels) {
+        try {
+          // 如果已经有完整信息（包括inviteLink），直接使用
+          if (channel.inviteLink) {
+            await prisma.lotteryChannel.create({
+              data: {
+                lotteryId: createdLottery.id,
+                chatId: channel.chatId,
+                title: channel.title,
+                type: channel.type,
+                username: channel.username,
+                inviteLink: channel.inviteLink,
+              }
+            })
+          } else {
+            // 否则自动获取频道信息和邀请链接
+            const channelInfo = await getChannelFullInfo(channel.chatId)
+            await prisma.lotteryChannel.create({
+              data: {
+                lotteryId: createdLottery.id,
+                chatId: channel.chatId,
+                title: channelInfo.title,
+                type: channelInfo.type,
+                username: channelInfo.username,
+                inviteLink: channelInfo.inviteLink,
+              }
+            })
+          }
+        } catch (error) {
+          console.error(`Failed to get channel info for ${channel.chatId}:`, error)
+          // 如果获取失败，使用提供的基本信息
+          await prisma.lotteryChannel.create({
+            data: {
+              lotteryId: createdLottery.id,
+              chatId: channel.chatId,
+              title: channel.title || channel.chatId,
+              type: channel.type || 'unknown',
+              username: channel.username,
+              inviteLink: channel.inviteLink,
+            }
+          })
+        }
+      }
+    }
+
+    // 重新获取抽奖（包含channels）
+    const lotteryWithChannels = await prisma.lottery.findUnique({
+      where: { id: createdLottery.id },
+      include: {
+        prizes: true,
+        channels: true,
+      }
+    })
+
     // 发送创建成功消息到创建者的 Telegram
     try {
-      await sendCreateSuccessMessage(createdLottery, user.id.toString())
+      await sendCreateSuccessMessage(lotteryWithChannels || createdLottery, user.id.toString())
     } catch (error) {
       console.error('Failed to send create success message:', error)
       // Don't fail the request if notification fails
@@ -155,7 +204,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      lottery: createdLottery,
+      lottery: lotteryWithChannels || createdLottery,
       pushResults,
     }, { status: 201 })
   } catch (error) {
