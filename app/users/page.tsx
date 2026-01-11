@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import DataTable from '@/components/DataTable'
-import { apiGet, apiPatch } from '@/lib/api'
+import { apiGet, apiPatch, apiPost } from '@/lib/api'
 
 type User = {
   id: string
@@ -30,6 +30,8 @@ export default function UsersPage() {
   const [showVipModal, setShowVipModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [vipExpireDate, setVipExpireDate] = useState('')
+  const [showBlacklistModal, setShowBlacklistModal] = useState(false)
+  const [blacklistReason, setBlacklistReason] = useState('')
 
   useEffect(() => {
     fetchUsers()
@@ -108,6 +110,41 @@ export default function UsersPage() {
       setShowVipModal(false)
       setSelectedUser(null)
       setVipExpireDate('')
+    }
+  }
+
+  const openBlacklistModal = (user: User) => {
+    setSelectedUser(user)
+    setBlacklistReason('')
+    setShowBlacklistModal(true)
+  }
+
+  const handleAddToBlacklist = async () => {
+    if (!selectedUser) return
+
+    if (!confirm(`确定要将用户「${selectedUser.firstName}」加入黑名单吗？`)) {
+      return
+    }
+
+    try {
+      const response = await apiPost('/api/blacklist', {
+        telegramId: selectedUser.telegramId,
+        reason: blacklistReason.trim() || null,
+      })
+
+      if (response.ok) {
+        alert('已加入黑名单')
+        setShowBlacklistModal(false)
+        setSelectedUser(null)
+        setBlacklistReason('')
+        fetchUsers()
+      } else {
+        const error = await response.json()
+        alert(`添加失败：${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error adding to blacklist:', error)
+      alert('添加失败，请稍后重试')
     }
   }
 
@@ -215,6 +252,12 @@ export default function UsersPage() {
             className="text-xs text-yellow-600 hover:text-yellow-700"
           >
             设置VIP
+          </button>
+          <button
+            onClick={() => openBlacklistModal(user)}
+            className="text-xs text-red-600 hover:text-red-700"
+          >
+            加入黑名单
           </button>
         </div>
       ),
@@ -341,6 +384,49 @@ export default function UsersPage() {
                 className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
               >
                 确认
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Blacklist Modal */}
+      {showBlacklistModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">
+              加入黑名单 - {selectedUser.firstName}
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                  原因（选填）
+                </label>
+                <textarea
+                  value={blacklistReason}
+                  onChange={(e) => setBlacklistReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="输入加入黑名单的原因"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowBlacklistModal(false)
+                  setSelectedUser(null)
+                  setBlacklistReason('')
+                }}
+                className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleAddToBlacklist}
+                className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+              >
+                确认加入
               </button>
             </div>
           </div>

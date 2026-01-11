@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { checkChatMember } from '@/lib/telegram'
 import { checkAndDraw } from '@/lib/lottery'
+import { isBlacklisted } from '@/lib/blacklist'
 
 type Params = {
   params: {
@@ -17,6 +18,14 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     if (!telegramId) {
       return NextResponse.json({ error: 'Missing telegramId' }, { status: 400 })
+    }
+
+    // 检查黑名单
+    if (await isBlacklisted(telegramId)) {
+      return NextResponse.json({ 
+        error: 'Blacklisted',
+        message: '❌ 您已被加入黑名单，无法参与抽奖。如有疑问请联系管理员。'
+      }, { status: 403 })
     }
 
     // 获取抽奖信息
