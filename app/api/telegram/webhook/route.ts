@@ -270,6 +270,30 @@ export async function POST(request: NextRequest) {
       // Handle /start command - 简化版本，确保基本功能
       if (text === '/start' || text.startsWith('/start ')) {
         try {
+          // 自动记录用户到数据库
+          const user = message.from
+          const now = new Date()
+          
+          if (user) {
+            const { prisma } = await import('@/lib/prisma')
+            await prisma.user.upsert({
+              where: { telegramId: String(user.id) },
+              create: {
+                telegramId: String(user.id),
+                username: user.username || null,
+                firstName: user.first_name || null,
+                lastName: user.last_name || null,
+                lastActiveAt: now,
+              },
+              update: {
+                username: user.username || null,
+                firstName: user.first_name || null,
+                lastName: user.last_name || null,
+                lastActiveAt: now,
+              }
+            })
+          }
+          
           const startParam = text.split(' ')[1]
           
           if (startParam?.startsWith('lottery_')) {
