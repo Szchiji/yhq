@@ -230,6 +230,7 @@ model LotteryChannel {
   title       String   // 群/频道名称
   type        String   // group, supergroup, channel
   username    String?  // @username（如果有）
+  inviteLink  String?  // 邀请链接（公开频道为 https://t.me/username，私密频道为 https://t.me/+ABC123）
   createdAt   DateTime @default(now())
   
   @@unique([lotteryId, chatId])

@@ -2,6 +2,14 @@ import crypto from 'crypto'
 import { prisma } from './prisma'
 import { getDefaultTemplate } from './placeholders'
 
+// Telegram API response types
+interface TelegramApiResponse<T = any> {
+  ok: boolean
+  result?: T
+  description?: string
+  error_code?: number
+}
+
 // Telegram User type
 export interface TelegramUser {
   id: number
@@ -179,6 +187,58 @@ export async function getChat(chatId: string) {
     body: JSON.stringify({ chat_id: chatId })
   })
   return response.json()
+}
+
+// 导出聊天邀请链接
+export async function exportChatInviteLink(chatId: string | number): Promise<TelegramApiResponse<string>> {
+  const botToken = process.env.BOT_TOKEN
+  if (!botToken) {
+    throw new Error('BOT_TOKEN is not set')
+  }
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/exportChatInviteLink`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId })
+  })
+  return response.json()
+}
+
+// 获取频道完整信息（包括邀请链接）
+export async function getChannelFullInfo(chatId: string): Promise<{
+  title: string
+  type: string
+  username?: string
+  inviteLink: string
+}> {
+  // 1. 获取基本信息
+  const chatInfo = await getChat(chatId)
+  if (!chatInfo.ok) {
+    throw new Error(chatInfo.description || 'Failed to get chat info')
+  }
+  
+  const title = chatInfo.result.title || chatInfo.result.first_name || 'Unknown'
+  const type = chatInfo.result.type || 'unknown'
+  const username = chatInfo.result.username
+  
+  // 2. 生成邀请链接
+  let inviteLink = ''
+  if (username) {
+    // 公开频道使用 username
+    inviteLink = `https://t.me/${username}`
+  } else {
+    // 私密频道需要导出邀请链接
+    try {
+      const linkResult = await exportChatInviteLink(chatId)
+      if (linkResult.ok && linkResult.result) {
+        inviteLink = linkResult.result
+      }
+    } catch (error) {
+      console.error('Failed to export invite link:', error)
+      // If export fails, inviteLink remains empty
+    }
+  }
+  
+  return { title, type, username, inviteLink }
 }
 
 // 获取群成员信息

@@ -210,7 +210,9 @@ type LotteryWithRelations = {
   creatorUsername?: string
   channels?: Array<{ 
     chatId: string
-    title: string 
+    title: string
+    username?: string | null
+    inviteLink?: string | null
   }>
   prizes?: Array<{ 
     name: string
@@ -321,43 +323,40 @@ export async function sendCreateSuccessMessage(
   lottery: { 
     id: string
     title: string
+    description?: string | null
     drawType: string
     drawTime: Date | null
     drawCount: number | null
     requireChannels: string[]
-    channels?: Array<{ chatId: string; title: string; username?: string | null }>
+    channels?: Array<{ chatId: string; title: string; username?: string | null; inviteLink?: string | null }>
     prizes: Array<{ name: string; total: number }>
   }, 
   creatorId: string
 ) {
-  // 使用模板系统
-  const template = await getTemplate('lottery_created', creatorId)
-  
-  // 构建奖品列表
-  const goodsList = lottery.prizes.map(p => `${p.name} x${p.total}`).join(', ')
-  
-  // 构建开奖条件
-  const openCondition = lottery.drawType === 'time' 
-    ? `定时开奖: ${lottery.drawTime ? new Date(lottery.drawTime).toLocaleString('zh-CN') : ''}` 
-    : `满 ${lottery.drawCount} 人开奖`
-  
-  // 使用创建时间作为显示时间
-  const displayTime = new Date().toLocaleString('zh-CN')
-
-  const message = replaceAllPlaceholders(template, {
-    lotterySn: lottery.id.slice(0, 8),
-    lotteryTitle: lottery.title,
-    goodsList,
-    openCondition,
-    drawTime: displayTime,
-  })
+  // 使用与推送相同的模板
+  const botUsername = await getBotUsername()
+  const message = await buildPublishMessage({
+    id: lottery.id,
+    title: lottery.title,
+    description: lottery.description,
+    drawType: lottery.drawType,
+    drawTime: lottery.drawTime,
+    drawCount: lottery.drawCount,
+    createdBy: creatorId,
+    channels: lottery.channels,
+    prizes: lottery.prizes,
+    _count: {
+      participants: 0
+    }
+  }, botUsername)
 
   try {
     await sendMessage(parseInt(creatorId), message, {
+      parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '📢 推送到群/频道', callback_data: `push_lottery_${lottery.id}` },
+            { text: '📢 推送到参与条件群', callback_data: `push_lottery_${lottery.id}` },
             { text: '👁 查看抽奖', callback_data: `view_lottery_${lottery.id}` }
           ],
           [
