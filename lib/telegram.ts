@@ -327,3 +327,35 @@ export async function syncCommandsToTelegram(): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * Generate join condition text with clickable channel links
+ * @param channels Array of channel objects with chatId, title, username, and optional inviteLink
+ * @returns HTML formatted string with clickable channel links
+ */
+export function generateJoinConditionText(channels: Array<{
+  chatId: string
+  title: string
+  username?: string | null
+  inviteLink?: string | null
+}>): string {
+  if (!channels || channels.length === 0) {
+    return '无需加入频道/群组'
+  }
+  
+  return channels.map(channel => {
+    let link = ''
+    if (channel.username) {
+      // Remove @ prefix if present
+      const cleanUsername = channel.username.replace(/^@/, '')
+      link = `https://t.me/${cleanUsername}`
+    } else if (channel.inviteLink) {
+      link = channel.inviteLink
+    }
+    
+    if (link) {
+      return `🎫 加入 <a href="${link}">${channel.title}</a>`
+    }
+    return `🎫 加入 ${channel.title}`
+  }).join('\n')
+}

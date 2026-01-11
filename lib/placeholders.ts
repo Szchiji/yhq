@@ -57,6 +57,10 @@ export const TEMPLATE_PLACEHOLDERS = {
   winner_public: [
     '{lotterySn}', '{lotteryTitle}', '{awardUserList}', '{joinNum}'
   ],
+  // 抽奖创建成功通知模板
+  lottery_created: [
+    '{lotterySn}', '{lotteryTitle}', '{goodsList}', '{openCondition}', '{drawTime}'
+  ],
 }
 
 // 默认模板
@@ -116,6 +120,15 @@ export function getDefaultTemplate(type: string): string {
 {awardUserList}
 
 恭喜以上中奖者！`,
+
+    lottery_created: `✅ 抽奖创建成功！
+
+📋 标题：{lotteryTitle}
+🎁 奖品：{goodsList}
+🎯 开奖：{openCondition}
+📅 创建：{drawTime}
+
+点击下方按钮进行操作。`,
   }
   
   return defaults[type] || ''
