@@ -2,6 +2,14 @@ import crypto from 'crypto'
 import { prisma } from './prisma'
 import { getDefaultTemplate } from './placeholders'
 
+// Telegram API response types
+interface TelegramApiResponse<T = any> {
+  ok: boolean
+  result?: T
+  description?: string
+  error_code?: number
+}
+
 // Telegram User type
 export interface TelegramUser {
   id: number
@@ -182,7 +190,7 @@ export async function getChat(chatId: string) {
 }
 
 // 导出聊天邀请链接
-export async function exportChatInviteLink(chatId: string | number): Promise<any> {
+export async function exportChatInviteLink(chatId: string | number): Promise<TelegramApiResponse<string>> {
   const botToken = process.env.BOT_TOKEN
   if (!botToken) {
     throw new Error('BOT_TOKEN is not set')
@@ -221,7 +229,7 @@ export async function getChannelFullInfo(chatId: string): Promise<{
     // 私密频道需要导出邀请链接
     try {
       const linkResult = await exportChatInviteLink(chatId)
-      if (linkResult.ok) {
+      if (linkResult.ok && linkResult.result) {
         inviteLink = linkResult.result
       }
     } catch (error) {
