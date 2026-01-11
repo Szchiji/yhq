@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendMessage, isAdmin, isSuperAdmin } from '@/lib/telegram'
+import { sendMessage, isAdmin, isSuperAdmin, generateJoinConditionText, getBotUsername } from '@/lib/telegram'
 
 // Get WebApp URL with fallback
 function getWebAppUrl(): string {
@@ -260,8 +260,6 @@ export async function POST(request: NextRequest) {
           }
           
           // 构建详情消息
-          const { generateJoinConditionText, getBotUsername } = await import('@/lib/telegram')
-          
           const botUsername = await getBotUsername()
           const joinCondition = lottery.channels && lottery.channels.length > 0
             ? generateJoinConditionText(lottery.channels)
