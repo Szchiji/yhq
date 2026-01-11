@@ -19,6 +19,7 @@ function HomeContent() {
     if (initData) {
       fetchStats()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initData])
 
   const fetchStats = async () => {

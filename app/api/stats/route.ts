@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { prisma, Prisma } from '@/lib/prisma'
 import { validateTelegramWebAppData, parseTelegramUser, isAdmin, isSuperAdmin } from '@/lib/telegram'
 
 // Helper function to get daily statistics
@@ -9,6 +9,7 @@ async function getDailyStats(days: number) {
   startDate.setHours(0, 0, 0, 0)
 
   // Execute all queries in parallel for better performance
+  // Note: Prisma's $queryRaw with template literals automatically parameterizes values to prevent SQL injection
   const [dailyUsers, dailyParticipants, dailyLotteries] = await Promise.all([
     // Get daily new users
     prisma.$queryRaw<Array<{ date: Date; count: bigint }>>`
