@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
 
     const where = search ? {
       OR: [
-        { telegramId: { contains: search } },
-        { username: { contains: search } },
-        { reason: { contains: search } }
+        { telegramId: { contains: search, mode: 'insensitive' as const } },
+        { username: { contains: search, mode: 'insensitive' as const } },
+        { reason: { contains: search, mode: 'insensitive' as const, not: null } }
       ]
     } : {}
 
