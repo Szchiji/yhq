@@ -83,7 +83,8 @@ async function sendReminderIfNeeded(
     user: '会员'
   }
 
-  const message = template || `
+  // 生成消息并替换模板变量
+  let message = template || `
 ⚠️ ${typeNames[type]}即将过期提醒
 
 您的${typeNames[type]}权限将在 ${daysLeft} 天后过期。
@@ -92,9 +93,12 @@ async function sendReminderIfNeeded(
 点击 /vip 查看续费方案。
   `.trim()
 
+  // 替换模板中的变量
+  message = message.replace(/{daysLeft}/g, String(daysLeft))
+
   // 发送消息
   try {
-    await sendMessage(telegramId, message)
+    await sendMessage(Number(telegramId), message)
 
     // 记录已发送
     await prisma.reminderLog.create({
