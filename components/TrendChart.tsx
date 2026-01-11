@@ -13,6 +13,8 @@ type TrendChartProps = {
   onTimeRangeChange: (range: number) => void
 }
 
+const MIN_BAR_HEIGHT = '4px'
+
 export default function TrendChart({
   dailyUsers,
   dailyParticipants,
@@ -83,7 +85,7 @@ export default function TrendChart({
                 <div
                   key={index}
                   className="flex-1 bg-blue-200 hover:bg-blue-300 rounded-t transition-all cursor-pointer group relative"
-                  style={{ height: `${height}%`, minHeight: item.count > 0 ? '4px' : '0px' }}
+                  style={{ height: `${height}%`, minHeight: item.count > 0 ? MIN_BAR_HEIGHT : '0px' }}
                   title={`${formatDate(item.date)}: ${item.count}`}
                 >
                   <div className="absolute bottom-full mb-1 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
@@ -110,7 +112,7 @@ export default function TrendChart({
                 <div
                   key={index}
                   className="flex-1 bg-green-200 hover:bg-green-300 rounded-t transition-all cursor-pointer group relative"
-                  style={{ height: `${height}%`, minHeight: item.count > 0 ? '4px' : '0px' }}
+                  style={{ height: `${height}%`, minHeight: item.count > 0 ? MIN_BAR_HEIGHT : '0px' }}
                   title={`${formatDate(item.date)}: ${item.count}`}
                 >
                   <div className="absolute bottom-full mb-1 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
@@ -137,7 +139,7 @@ export default function TrendChart({
                 <div
                   key={index}
                   className="flex-1 bg-purple-200 hover:bg-purple-300 rounded-t transition-all cursor-pointer group relative"
-                  style={{ height: `${height}%`, minHeight: item.count > 0 ? '4px' : '0px' }}
+                  style={{ height: `${height}%`, minHeight: item.count > 0 ? MIN_BAR_HEIGHT : '0px' }}
                   title={`${formatDate(item.date)}: ${item.count}`}
                 >
                   <div className="absolute bottom-full mb-1 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">

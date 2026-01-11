@@ -13,8 +13,16 @@ const colorClasses = {
   orange: 'bg-orange-50 border-orange-100 text-orange-600',
 }
 
+const textColorClasses = {
+  blue: 'text-blue-600',
+  green: 'text-green-600',
+  purple: 'text-purple-600',
+  orange: 'text-orange-600',
+}
+
 export default function StatsCard({ title, value, icon, trend, color }: StatsCardProps) {
   const colorClass = colorClasses[color]
+  const textColor = textColorClasses[color]
   
   return (
     <div className={`${colorClass} rounded-lg p-4 border`}>
@@ -26,7 +34,7 @@ export default function StatsCard({ title, value, icon, trend, color }: StatsCar
           </span>
         )}
       </div>
-      <p className={`text-2xl font-bold mt-2 ${color === 'blue' ? 'text-blue-600' : color === 'green' ? 'text-green-600' : color === 'purple' ? 'text-purple-600' : 'text-orange-600'}`}>
+      <p className={`text-2xl font-bold mt-2 ${textColor}`}>
         {value.toLocaleString()}
       </p>
       <p className="text-gray-600 text-sm mt-1">{title}</p>

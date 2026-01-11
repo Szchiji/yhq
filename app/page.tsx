@@ -8,17 +8,43 @@ import TrendChart from '@/components/TrendChart'
 import RecentLotteries from '@/components/RecentLotteries'
 import RecentWinners from '@/components/RecentWinners'
 
+type DailyData = {
+  date: Date
+  count: number
+}
+
+type Lottery = {
+  id: string
+  title: string
+  status: string
+  createdAt: Date
+  _count: {
+    participants: number
+  }
+}
+
+type Winner = {
+  id: string
+  username: string | null
+  firstName: string | null
+  prizeName: string
+  wonAt: Date
+  lottery: {
+    title: string
+  }
+}
+
 type StatsData = {
   totalLotteries: number
   totalParticipants: number
   totalUsers: number
   todayUsers: number
-  recentLotteries: any[]
-  recentWinners: any[]
+  recentLotteries: Lottery[]
+  recentWinners: Winner[]
   dailyStats: {
-    dailyUsers: Array<{ date: Date; count: number }>
-    dailyParticipants: Array<{ date: Date; count: number }>
-    dailyLotteries: Array<{ date: Date; count: number }>
+    dailyUsers: DailyData[]
+    dailyParticipants: DailyData[]
+    dailyLotteries: DailyData[]
   }
 }
 
@@ -29,7 +55,7 @@ function HomeContent() {
   const [timeRange, setTimeRange] = useState(7)
 
   useEffect(() => {
-    if (initData) {
+    if (initData && initData.length > 0) {
       fetchStats()
     }
   }, [initData])

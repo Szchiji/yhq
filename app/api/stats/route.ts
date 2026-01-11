@@ -8,32 +8,33 @@ async function getDailyStats(days: number) {
   startDate.setDate(startDate.getDate() - days)
   startDate.setHours(0, 0, 0, 0)
 
-  // Get daily new users
-  const dailyUsers = await prisma.$queryRaw<Array<{ date: Date; count: bigint }>>`
-    SELECT DATE("createdAt") as date, COUNT(*) as count
-    FROM "User"
-    WHERE "createdAt" >= ${startDate}
-    GROUP BY DATE("createdAt")
-    ORDER BY date
-  `
-
-  // Get daily participants
-  const dailyParticipants = await prisma.$queryRaw<Array<{ date: Date; count: bigint }>>`
-    SELECT DATE("joinedAt") as date, COUNT(*) as count
-    FROM "Participant"
-    WHERE "joinedAt" >= ${startDate}
-    GROUP BY DATE("joinedAt")
-    ORDER BY date
-  `
-
-  // Get daily created lotteries
-  const dailyLotteries = await prisma.$queryRaw<Array<{ date: Date; count: bigint }>>`
-    SELECT DATE("createdAt") as date, COUNT(*) as count
-    FROM "Lottery"
-    WHERE "createdAt" >= ${startDate}
-    GROUP BY DATE("createdAt")
-    ORDER BY date
-  `
+  // Execute all queries in parallel for better performance
+  const [dailyUsers, dailyParticipants, dailyLotteries] = await Promise.all([
+    // Get daily new users
+    prisma.$queryRaw<Array<{ date: Date; count: bigint }>>`
+      SELECT DATE("createdAt") as date, COUNT(*) as count
+      FROM "User"
+      WHERE "createdAt" >= ${startDate}
+      GROUP BY DATE("createdAt")
+      ORDER BY date
+    `,
+    // Get daily participants
+    prisma.$queryRaw<Array<{ date: Date; count: bigint }>>`
+      SELECT DATE("joinedAt") as date, COUNT(*) as count
+      FROM "Participant"
+      WHERE "joinedAt" >= ${startDate}
+      GROUP BY DATE("joinedAt")
+      ORDER BY date
+    `,
+    // Get daily created lotteries
+    prisma.$queryRaw<Array<{ date: Date; count: bigint }>>`
+      SELECT DATE("createdAt") as date, COUNT(*) as count
+      FROM "Lottery"
+      WHERE "createdAt" >= ${startDate}
+      GROUP BY DATE("createdAt")
+      ORDER BY date
+    `
+  ])
 
   return {
     dailyUsers: dailyUsers.map(item => ({ date: item.date, count: Number(item.count) })),
