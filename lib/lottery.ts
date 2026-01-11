@@ -210,7 +210,9 @@ type LotteryWithRelations = {
   creatorUsername?: string
   channels?: Array<{ 
     chatId: string
-    title: string 
+    title: string
+    username?: string | null
+    inviteLink?: string | null
   }>
   prizes?: Array<{ 
     name: string
