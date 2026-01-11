@@ -15,6 +15,7 @@ type MenuItem = {
 const getSuperAdminMenuItems = (): MenuItem[] => [
   { name: '首页', href: '/' },
   { name: '抽奖列表', href: '/lottery' },
+  { name: '中奖记录', href: '/winners' },
   { name: '消息模板', href: '/templates' },
   { name: '公告群/频道', href: '/announcements' },
   { name: '已加入的群/频道', href: '/groups' },
@@ -39,6 +40,7 @@ const getSuperAdminMenuItems = (): MenuItem[] => [
 const getAdminMenuItems = (): MenuItem[] => [
   { name: '首页', href: '/' },
   { name: '抽奖列表', href: '/lottery' },
+  { name: '中奖记录', href: '/winners' },
   { name: '消息模板', href: '/templates' },
   { name: '已加入的群/频道', href: '/groups' },
   { name: '强制加入群/频道', href: '/forced-join' },
