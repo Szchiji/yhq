@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { apiGet, apiPatch, apiDelete, apiPost } from '@/lib/api'
+import { formatDateTime } from '@/lib/date-format'
 
 type Winner = {
   id: string
@@ -371,13 +372,7 @@ export default function WinnersPage() {
                       {winner.prize?.name || winner.prizeName}
                     </td>
                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-600">
-                      {new Date(winner.createdAt).toLocaleString('zh-CN', { 
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {formatDateTime(winner.createdAt)}
                     </td>
                     <td className="px-3 sm:px-6 py-4">
                       <div className="flex flex-col gap-1">

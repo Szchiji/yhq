@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
 import { isAdmin } from '@/lib/auth'
+import { formatDateTime } from '@/lib/date-format'
 
 // GET /api/winners/export - 导出中奖记录为 CSV
 export async function GET(request: NextRequest) {
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
       const telegramId = w.telegramId
       const lotteryTitle = w.lottery?.title || ''
       const prizeName = w.prize?.name || w.prizeName || ''
-      const wonAt = new Date(w.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+      const wonAt = formatDateTime(w.createdAt)
       const claimedStatus = w.claimed ? '已领取' : '未领取'
       
       // Escape CSV fields that contain commas or quotes
