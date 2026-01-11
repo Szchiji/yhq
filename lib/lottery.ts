@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import { sendMessage, getBotUsername, getChat, getTemplate } from './telegram'
+import { sendMessage, getBotUsername, getChat, getTemplate, generateJoinConditionText } from './telegram'
 import { replaceAllPlaceholders } from './placeholders'
 
 // 执行开奖
@@ -226,9 +226,6 @@ export async function buildPublishMessage(lottery: LotteryWithRelations, botUser
   // 从数据库获取用户自定义模板
   const template = await getTemplate('edit_success', lottery.createdBy)
   
-  // Import generateJoinConditionText function
-  const { generateJoinConditionText } = await import('./telegram')
-  
   // 构建参与条件文本 - 使用可点击链接
   const joinCondition = lottery.channels && lottery.channels.length > 0
     ? generateJoinConditionText(lottery.channels)
@@ -340,20 +337,19 @@ export async function sendCreateSuccessMessage(
   const goodsList = lottery.prizes.map(p => `${p.name} x${p.total}`).join(', ')
   
   // 构建开奖条件
-  const drawTime = lottery.drawType === 'time' && lottery.drawTime
-    ? new Date(lottery.drawTime).toLocaleString('zh-CN')
-    : new Date().toLocaleString('zh-CN')
-  
   const openCondition = lottery.drawType === 'time' 
     ? `定时开奖: ${lottery.drawTime ? new Date(lottery.drawTime).toLocaleString('zh-CN') : ''}` 
     : `满 ${lottery.drawCount} 人开奖`
+  
+  // 使用创建时间作为显示时间
+  const displayTime = new Date().toLocaleString('zh-CN')
 
   const message = replaceAllPlaceholders(template, {
     lotterySn: lottery.id.slice(0, 8),
     lotteryTitle: lottery.title,
     goodsList,
     openCondition,
-    drawTime,
+    drawTime: displayTime,
   })
 
   try {

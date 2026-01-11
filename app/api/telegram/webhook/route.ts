@@ -323,6 +323,12 @@ export async function POST(request: NextRequest) {
         
         try {
           const webappUrl = getWebAppUrl()
+          if (!webappUrl) {
+            await answerCallbackQuery(callbackQuery.id, '系统配置错误')
+            await sendMessage(chatId, '❌ 系统配置错误，无法打开管理后台')
+            return NextResponse.json({ ok: true })
+          }
+          
           await answerCallbackQuery(callbackQuery.id)
           await sendMessage(chatId, '点击下方按钮打开管理后台：', {
             reply_markup: {
@@ -342,6 +348,12 @@ export async function POST(request: NextRequest) {
       if (data === 'lottery_list') {
         try {
           const webappUrl = getWebAppUrl()
+          if (!webappUrl) {
+            await answerCallbackQuery(callbackQuery.id, '系统配置错误')
+            await sendMessage(chatId, '❌ 系统配置错误，无法打开抽奖列表')
+            return NextResponse.json({ ok: true })
+          }
+          
           await answerCallbackQuery(callbackQuery.id)
           await sendMessage(chatId, '点击下方按钮查看抽奖列表：', {
             reply_markup: {
