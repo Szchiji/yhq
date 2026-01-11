@@ -226,9 +226,12 @@ export async function buildPublishMessage(lottery: LotteryWithRelations, botUser
   // 从数据库获取用户自定义模板
   const template = await getTemplate('edit_success', lottery.createdBy)
   
-  // 构建参与条件文本
+  // Import generateJoinConditionText function
+  const { generateJoinConditionText } = await import('./telegram')
+  
+  // 构建参与条件文本 - 使用可点击链接
   const joinCondition = lottery.channels && lottery.channels.length > 0
-    ? lottery.channels.map((c) => `🎫 加入-${c.title}`).join('\n')
+    ? generateJoinConditionText(lottery.channels)
     : '无需加入频道/群组'
   
   // 构建奖品列表
@@ -330,22 +333,44 @@ export async function sendCreateSuccessMessage(
   }, 
   creatorId: string
 ) {
+  // 使用模板系统
+  const template = await getTemplate('lottery_created', creatorId)
+  
+  // 构建奖品列表
   const goodsList = lottery.prizes.map(p => `${p.name} x${p.total}`).join(', ')
+  
+  // 构建开奖条件
+  const drawTime = lottery.drawType === 'time' && lottery.drawTime
+    ? new Date(lottery.drawTime).toLocaleString('zh-CN')
+    : new Date().toLocaleString('zh-CN')
+  
   const openCondition = lottery.drawType === 'time' 
     ? `定时开奖: ${lottery.drawTime ? new Date(lottery.drawTime).toLocaleString('zh-CN') : ''}` 
     : `满 ${lottery.drawCount} 人开奖`
 
-  const message = `✅ 抽奖创建成功！
-
-📋 标题：${lottery.title}
-🎁 奖品：${goodsList}
-👥 开奖：${openCondition}
-📅 创建：${new Date().toLocaleString('zh-CN')}
-
-抽奖已自动推送到所有公告群/频道。`
+  const message = replaceAllPlaceholders(template, {
+    lotterySn: lottery.id.slice(0, 8),
+    lotteryTitle: lottery.title,
+    goodsList,
+    openCondition,
+    drawTime,
+  })
 
   try {
-    await sendMessage(parseInt(creatorId), message)
+    await sendMessage(parseInt(creatorId), message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '📢 推送到群/频道', callback_data: `push_lottery_${lottery.id}` },
+            { text: '👁 查看抽奖', callback_data: `view_lottery_${lottery.id}` }
+          ],
+          [
+            { text: '⚙️ 管理抽奖', callback_data: `manage_lottery_${lottery.id}` },
+            { text: '📋 抽奖列表', callback_data: 'lottery_list' }
+          ]
+        ]
+      }
+    })
   } catch (error) {
     console.error('Failed to send create success message:', error)
   }

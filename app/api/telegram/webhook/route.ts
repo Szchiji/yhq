@@ -191,6 +191,171 @@ export async function POST(request: NextRequest) {
         }
         return NextResponse.json({ ok: true })
       }
+
+      // 推送抽奖 - 显示可推送的群组/频道列表
+      if (data.startsWith('push_lottery_')) {
+        const lotteryId = data.replace('push_lottery_', '')
+        
+        try {
+          // 获取所有公告群/频道
+          const channels = await prisma.announcementChannel.findMany({
+            orderBy: { createdAt: 'desc' }
+          })
+          
+          if (channels.length === 0) {
+            await answerCallbackQuery(callbackQuery.id, '暂无可推送的群组/频道')
+            await sendMessage(chatId, '⚠️ 暂无配置的公告群/频道\n\n请先在管理后台添加公告群/频道。')
+            return NextResponse.json({ ok: true })
+          }
+          
+          // 构建按钮列表
+          const buttons = channels.map(channel => [{
+            text: `📢 ${channel.title}`,
+            callback_data: `publish_${lotteryId}_${channel.chatId}`
+          }])
+          
+          // 添加"推送到全部"按钮
+          buttons.push([{
+            text: '🔔 推送到全部群组',
+            callback_data: `publish_all_${lotteryId}`
+          }])
+          
+          await answerCallbackQuery(callbackQuery.id)
+          await sendMessage(chatId, '请选择要推送的群组/频道：', {
+            reply_markup: {
+              inline_keyboard: buttons
+            }
+          })
+        } catch (error) {
+          console.error('Error in push_lottery callback:', error)
+          await answerCallbackQuery(callbackQuery.id, '获取列表失败')
+          await sendMessage(chatId, '❌ 获取群组列表失败，请稍后重试')
+        }
+        return NextResponse.json({ ok: true })
+      }
+      
+      // 查看抽奖详情
+      if (data.startsWith('view_lottery_')) {
+        const lotteryId = data.replace('view_lottery_', '')
+        
+        try {
+          const lottery = await prisma.lottery.findUnique({
+            where: { id: lotteryId },
+            include: {
+              prizes: true,
+              channels: true,
+              _count: {
+                select: {
+                  participants: true,
+                  winners: true
+                }
+              }
+            }
+          })
+          
+          if (!lottery) {
+            await answerCallbackQuery(callbackQuery.id, '抽奖不存在')
+            await sendMessage(chatId, '⚠️ 抽奖不存在或已被删除')
+            return NextResponse.json({ ok: true })
+          }
+          
+          // 构建详情消息
+          const { generateJoinConditionText } = await import('@/lib/telegram')
+          const { getBotUsername } = await import('@/lib/telegram')
+          
+          const botUsername = await getBotUsername()
+          const joinCondition = lottery.channels && lottery.channels.length > 0
+            ? generateJoinConditionText(lottery.channels)
+            : '无需加入频道/群组'
+          
+          const goodsList = lottery.prizes && lottery.prizes.length > 0
+            ? lottery.prizes.map(p => `💰 ${p.name} × ${p.total}`).join('\n')
+            : '暂无奖品'
+          
+          const drawTime = lottery.drawTime 
+            ? new Date(lottery.drawTime).toLocaleString('zh-CN')
+            : ''
+          const openCondition = lottery.drawType === 'time' 
+            ? `${drawTime} 自动开奖` 
+            : `满 ${lottery.drawCount} 人开奖`
+          
+          const statusEmoji = lottery.status === 'active' ? '🟢' : lottery.status === 'drawn' ? '🏆' : '⚪'
+          const statusText = lottery.status === 'active' ? '进行中' : lottery.status === 'drawn' ? '已开奖' : '已结束'
+          
+          let detailMessage = `📋 抽奖详情\n\n`
+          detailMessage += `${statusEmoji} 状态：${statusText}\n`
+          detailMessage += `🎁 标题：${lottery.title}\n\n`
+          
+          if (lottery.description) {
+            detailMessage += `📝 说明：${lottery.description}\n\n`
+          }
+          
+          detailMessage += `🎁 奖品：\n${goodsList}\n\n`
+          detailMessage += `🎫 参与条件：\n${joinCondition}\n\n`
+          detailMessage += `⏰ 开奖条件：${openCondition}\n`
+          detailMessage += `👥 参与人数：${lottery._count.participants}\n`
+          
+          if (lottery.status === 'drawn') {
+            detailMessage += `🏆 中奖人数：${lottery._count.winners}\n`
+          }
+          
+          detailMessage += `\n📅 创建时间：${lottery.createdAt.toLocaleString('zh-CN')}`
+          
+          await answerCallbackQuery(callbackQuery.id)
+          await sendMessage(chatId, detailMessage, {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🔗 参与链接', url: `https://t.me/${botUsername}?start=lottery_${lottery.id}` }
+              ]]
+            }
+          })
+        } catch (error) {
+          console.error('Error viewing lottery:', error)
+          await answerCallbackQuery(callbackQuery.id, '获取详情失败')
+          await sendMessage(chatId, '❌ 获取抽奖详情失败，请稍后重试')
+        }
+        return NextResponse.json({ ok: true })
+      }
+      
+      // 管理抽奖
+      if (data.startsWith('manage_lottery_')) {
+        const lotteryId = data.replace('manage_lottery_', '')
+        
+        try {
+          const webappUrl = getWebAppUrl()
+          await answerCallbackQuery(callbackQuery.id)
+          await sendMessage(chatId, '点击下方按钮打开管理后台：', {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '⚙️ 打开管理后台', url: `${webappUrl}/lottery/${lotteryId}` }
+              ]]
+            }
+          })
+        } catch (error) {
+          console.error('Error in manage_lottery callback:', error)
+          await answerCallbackQuery(callbackQuery.id, '操作失败')
+        }
+        return NextResponse.json({ ok: true })
+      }
+      
+      // 抽奖列表
+      if (data === 'lottery_list') {
+        try {
+          const webappUrl = getWebAppUrl()
+          await answerCallbackQuery(callbackQuery.id)
+          await sendMessage(chatId, '点击下方按钮查看抽奖列表：', {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '📋 我的抽奖', url: `${webappUrl}/lottery` }
+              ]]
+            }
+          })
+        } catch (error) {
+          console.error('Error in lottery_list callback:', error)
+          await answerCallbackQuery(callbackQuery.id, '操作失败')
+        }
+        return NextResponse.json({ ok: true })
+      }
       
       // 推送到全部
       if (data.startsWith('publish_all_')) {
