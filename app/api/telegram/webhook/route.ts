@@ -260,8 +260,7 @@ export async function POST(request: NextRequest) {
           }
           
           // 构建详情消息
-          const { generateJoinConditionText } = await import('@/lib/telegram')
-          const { getBotUsername } = await import('@/lib/telegram')
+          const { generateJoinConditionText, getBotUsername } = await import('@/lib/telegram')
           
           const botUsername = await getBotUsername()
           const joinCondition = lottery.channels && lottery.channels.length > 0
