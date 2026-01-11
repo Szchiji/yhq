@@ -13,6 +13,7 @@ type Winner = {
   claimed: boolean
   claimedAt: string | null
   createdAt: string
+  wonAt: string
   notified: boolean
   user: {
     id: string
@@ -372,7 +373,7 @@ export default function WinnersPage() {
                       {winner.prize?.name || winner.prizeName}
                     </td>
                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-600">
-                      {formatDateTime(winner.createdAt)}
+                      {formatDateTime(winner.wonAt)}
                     </td>
                     <td className="px-3 sm:px-6 py-4">
                       <div className="flex flex-col gap-1">

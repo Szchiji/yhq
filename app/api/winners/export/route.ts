@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       const telegramId = w.telegramId
       const lotteryTitle = w.lottery?.title || ''
       const prizeName = w.prize?.name || w.prizeName || ''
-      const wonAt = formatDateTime(w.createdAt)
+      const wonAt = formatDateTime(w.wonAt)
       const claimedStatus = w.claimed ? '已领取' : '未领取'
       
       // Escape CSV fields that contain commas or quotes
