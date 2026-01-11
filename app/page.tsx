@@ -7,55 +7,16 @@ import StatsCard from '@/components/StatsCard'
 import TrendChart from '@/components/TrendChart'
 import RecentLotteries from '@/components/RecentLotteries'
 import RecentWinners from '@/components/RecentWinners'
-
-type DailyData = {
-  date: Date
-  count: number
-}
-
-type Lottery = {
-  id: string
-  title: string
-  status: string
-  createdAt: Date
-  _count: {
-    participants: number
-  }
-}
-
-type Winner = {
-  id: string
-  username: string | null
-  firstName: string | null
-  prizeName: string
-  wonAt: Date
-  lottery: {
-    title: string
-  }
-}
-
-type StatsData = {
-  totalLotteries: number
-  totalParticipants: number
-  totalUsers: number
-  todayUsers: number
-  recentLotteries: Lottery[]
-  recentWinners: Winner[]
-  dailyStats: {
-    dailyUsers: DailyData[]
-    dailyParticipants: DailyData[]
-    dailyLotteries: DailyData[]
-  }
-}
+import type { DashboardStats } from '@/types'
 
 function HomeContent() {
   const { user, initData } = useTelegramWebApp()
-  const [stats, setStats] = useState<StatsData | null>(null)
+  const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState(7)
 
   useEffect(() => {
-    if (initData && initData.length > 0) {
+    if (initData) {
       fetchStats()
     }
   }, [initData])

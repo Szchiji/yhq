@@ -1,17 +1,8 @@
 import Link from 'next/link'
-
-type Lottery = {
-  id: string
-  title: string
-  status: string
-  createdAt: Date | string
-  _count: {
-    participants: number
-  }
-}
+import type { LotterySummary } from '@/types'
 
 type RecentLotteriesProps = {
-  lotteries: Lottery[]
+  lotteries: LotterySummary[]
 }
 
 const statusLabels: Record<string, { text: string; color: string }> = {

@@ -1,9 +1,6 @@
 'use client'
 
-type DailyData = {
-  date: Date | string
-  count: number
-}
+import type { DailyData } from '@/types'
 
 type TrendChartProps = {
   dailyUsers: DailyData[]

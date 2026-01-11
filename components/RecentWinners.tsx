@@ -1,16 +1,7 @@
-type Winner = {
-  id: string
-  username: string | null
-  firstName: string | null
-  prizeName: string
-  wonAt: Date | string
-  lottery: {
-    title: string
-  }
-}
+import type { WinnerRecord } from '@/types'
 
 type RecentWinnersProps = {
-  winners: Winner[]
+  winners: WinnerRecord[]
 }
 
 export default function RecentWinners({ winners }: RecentWinnersProps) {
@@ -24,7 +15,7 @@ export default function RecentWinners({ winners }: RecentWinnersProps) {
     })
   }
 
-  const getUserName = (winner: Winner) => {
+  const getUserName = (winner: WinnerRecord) => {
     if (winner.username) return `@${winner.username}`
     if (winner.firstName) return winner.firstName
     return '匿名用户'
