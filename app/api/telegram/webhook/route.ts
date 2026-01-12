@@ -36,9 +36,53 @@ export async function POST(request: NextRequest) {
       const { prisma } = await import('@/lib/prisma')
       const { publishLottery } = await import('@/lib/lottery')
 
+      // Handle button callbacks for new features
+      if (data === 'show_lotteries') {
+        const { handleShowLotteries } = await import('@/lib/botCommands')
+        await handleShowLotteries(String(chatId), userId, callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'show_vip') {
+        const { handleVipCommand } = await import('@/lib/vipPurchase')
+        await handleVipCommand(String(chatId), userId)
+        await answerCallbackQuery(callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'show_my') {
+        const { handleMyCommand } = await import('@/lib/botCommands')
+        await handleMyCommand(String(chatId), userId)
+        await answerCallbackQuery(callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'show_help') {
+        const { handleHelpCommand } = await import('@/lib/botCommands')
+        await handleHelpCommand(String(chatId))
+        await answerCallbackQuery(callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'back_to_menu') {
+        const { handleStartCommand } = await import('@/lib/botCommands')
+        const user = callbackQuery.from
+        await handleStartCommand(String(chatId), userId, user)
+        await answerCallbackQuery(callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle join_lottery_ callback (from lottery list)
+      if (data.startsWith('join_lottery_')) {
+        const lotteryId = data.replace('join_lottery_', '')
+        // Reuse the same join logic as join_
+        const joinData = `join_${lotteryId}`
+        // Set data to the join format so it falls through to the handler below
+      }
+
       if (data.startsWith('join_')) {
         // 参与抽奖
-        const lotteryId = data.replace('join_', '')
+        const lotteryId = data.replace('join_', '').replace('lottery_', '')
         
         try {
           // Call join API
@@ -675,8 +719,9 @@ export async function POST(request: NextRequest) {
               await sendMessage(chatId, '⚠️ 处理失败，请稍后重试')
             }
           } else {
-            // 普通欢迎消息 - 简单版本，不依赖数据库
-            await sendMessage(chatId, '👋 欢迎使用抽奖机器人！\n\n使用以下命令：\n/new - 创建抽奖\n/mylottery - 我的抽奖\n/vip - VIP会员')
+            // 普通欢迎消息 - 使用新的欢迎界面
+            const { handleStartCommand } = await import('@/lib/botCommands')
+            await handleStartCommand(String(chatId), userId || '', message.from)
           }
         } catch (error) {
           console.error('Error handling /start:', error)
@@ -808,7 +853,20 @@ export async function POST(request: NextRequest) {
 
       // Handle /help command
       if (text === '/help') {
-        await sendMessage(chatId, '📖 使用帮助\n\n/bot - 打开管理后台\n/new - 创建新抽奖\n/mylottery - 查看我的抽奖\n\n如需帮助，请联系管理员。')
+        const { handleHelpCommand } = await import('@/lib/botCommands')
+        await handleHelpCommand(String(chatId))
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle /my command
+      if (text === '/my') {
+        if (!userId) {
+          await sendMessage(chatId, '⛔ 无法识别用户身份')
+          return NextResponse.json({ ok: true })
+        }
+
+        const { handleMyCommand } = await import('@/lib/botCommands')
+        await handleMyCommand(String(chatId), userId)
         return NextResponse.json({ ok: true })
       }
     }
