@@ -29,7 +29,12 @@ export async function notifyAdminNewOrder(
       return
     }
 
-    const webappUrl = process.env.WEBAPP_URL || ''
+    const webappUrl = process.env.WEBAPP_URL
+    if (!webappUrl) {
+      console.error('WEBAPP_URL not set')
+      return
+    }
+
     const roleNames: Record<string, string> = { 
       user: '普通用户', 
       vip: 'VIP会员', 

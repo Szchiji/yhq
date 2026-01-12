@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import DataTable from '@/components/DataTable'
 import { apiGet, apiPut } from '@/lib/api'
 
+const PAGE_SIZE = 20
+
 type Order = {
   id: string
   orderNo: string
@@ -45,7 +47,7 @@ export default function OrdersPage() {
       setLoading(true)
       const params = new URLSearchParams()
       params.append('page', page.toString())
-      params.append('limit', '20')
+      params.append('limit', PAGE_SIZE.toString())
       params.append('status', statusFilter)
       if (searchQuery) params.append('search', searchQuery)
       
@@ -240,7 +242,7 @@ export default function OrdersPage() {
     },
   ]
 
-  const totalPages = Math.ceil(total / 20)
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
     <div className="space-y-4 sm:space-y-6">

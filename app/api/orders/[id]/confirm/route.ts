@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
-import { isAdmin, isSuperAdmin } from '@/lib/auth'
+import { isAdmin } from '@/lib/auth'
 import { notifyUserOrderConfirmed } from '@/lib/orderManagement'
 
 /**
@@ -15,6 +15,32 @@ function calculateExpireAt(days: number): Date | null {
   const expireAt = new Date()
   expireAt.setDate(expireAt.getDate() + days)
   return expireAt
+}
+
+/**
+ * 创建或更新管理员记录
+ */
+async function createOrUpdateAdmin(
+  telegramId: string,
+  username: string | null,
+  firstName: string | null,
+  lastName: string | null,
+  adminId: string
+) {
+  await prisma.admin.upsert({
+    where: { telegramId },
+    create: {
+      telegramId,
+      username: username || null,
+      firstName: firstName || null,
+      lastName: lastName || null,
+      isActive: true,
+      createdBy: adminId
+    },
+    update: {
+      isActive: true
+    }
+  })
 }
 
 /**
@@ -117,20 +143,13 @@ export async function PUT(
         })
         
         if (existingUser) {
-          await prisma.admin.upsert({
-            where: { telegramId: order.userId },
-            create: {
-              telegramId: order.userId,
-              username: existingUser.username || null,
-              firstName: existingUser.firstName || null,
-              lastName: existingUser.lastName || null,
-              isActive: true,
-              createdBy: adminId
-            },
-            update: {
-              isActive: true
-            }
-          })
+          await createOrUpdateAdmin(
+            order.userId,
+            existingUser.username,
+            existingUser.firstName,
+            existingUser.lastName,
+            adminId
+          )
           
           // 更新用户的管理员状态
           await prisma.user.update({
@@ -141,7 +160,7 @@ export async function PUT(
             }
           })
         } else {
-          // 创建新用户和管理员记录
+          // 创建新用户
           await prisma.user.create({
             data: {
               telegramId: order.userId,
@@ -152,15 +171,14 @@ export async function PUT(
             }
           })
           
-          await prisma.admin.create({
-            data: {
-              telegramId: order.userId,
-              username: order.username || null,
-              firstName: order.firstName || null,
-              isActive: true,
-              createdBy: adminId
-            }
-          })
+          // 创建管理员记录
+          await createOrUpdateAdmin(
+            order.userId,
+            order.username,
+            order.firstName,
+            null,
+            adminId
+          )
         }
         break
 
