@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
+import { parseTelegramUser, validateTelegramWebAppData, getChat, exportChatInviteLink } from '@/lib/telegram'
 import { isAdmin } from '@/lib/auth'
 
 // GET - 获取强制加入群/频道列表
@@ -33,19 +33,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 })
     }
 
-    // Get user from database
-    const dbUser = await prisma.user.findUnique({
-      where: { telegramId: user.id.toString() }
-    })
-
-    if (!dbUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Get forced join channels for this user
+    // Get all forced join channels (system-wide)
     const channels = await prisma.forcedJoinChannel.findMany({
-      where: { userId: dbUser.id },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { sortOrder: 'asc' }
     })
 
     return NextResponse.json({ data: channels })
@@ -55,11 +45,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - 添加强制加入群/频道
+// POST - 添加强制加入群/频道（通过 Chat ID 自动获取信息）
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { chatId, title, type, username, inviteLink, isRequired, isEnabled } = body
+    const { chatId, isRequired, isEnabled } = body
     
     // Get initData from header
     const initData = request.headers.get('x-telegram-init-data')
@@ -89,57 +79,74 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证必需字段
-    if (!chatId || !title || !type) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!chatId) {
+      return NextResponse.json({ error: 'Chat ID is required' }, { status: 400 })
     }
 
-    // Get or create user
-    let dbUser = await prisma.user.findUnique({
-      where: { telegramId: user.id.toString() }
-    })
+    // 通过 Telegram API 获取群/频道信息
+    const chatInfo = await getChat(chatId)
+    if (!chatInfo.ok) {
+      return NextResponse.json({ 
+        error: `Failed to get chat info: ${chatInfo.description || 'Unknown error'}` 
+      }, { status: 400 })
+    }
 
-    if (!dbUser) {
-      dbUser = await prisma.user.create({
-        data: {
-          telegramId: user.id.toString(),
-          username: user.username,
-          firstName: user.first_name,
-          lastName: user.last_name,
+    const chat = chatInfo.result
+    const title = chat.title || chat.first_name || 'Unknown'
+    const type = chat.type || 'unknown'
+    const username = chat.username || null
+
+    // 尝试获取邀请链接
+    let inviteLink = null
+    if (username) {
+      inviteLink = `https://t.me/${username}`
+    } else {
+      try {
+        const linkResult = await exportChatInviteLink(chatId)
+        if (linkResult.ok && linkResult.result) {
+          inviteLink = linkResult.result
         }
-      })
+      } catch (error) {
+        console.warn('Failed to export invite link:', error)
+      }
     }
 
-    // Create or update forced join channel
+    // Get current max sortOrder
+    const maxSortOrder = await prisma.forcedJoinChannel.aggregate({
+      _max: { sortOrder: true }
+    })
+    const nextSortOrder = (maxSortOrder._max.sortOrder || 0) + 1
+
+    // Create or update forced join channel (system-wide)
     const channel = await prisma.forcedJoinChannel.upsert({
       where: {
-        userId_chatId: {
-          userId: dbUser.id,
-          chatId: chatId
-        }
+        chatId: chatId
       },
       update: {
         title,
         type,
-        username: username || null,
-        inviteLink: inviteLink || null,
+        username,
+        inviteLink,
         isRequired: isRequired !== undefined ? isRequired : true,
         isEnabled: isEnabled !== undefined ? isEnabled : true,
       },
       create: {
-        userId: dbUser.id,
         chatId,
         title,
         type,
-        username: username || null,
-        inviteLink: inviteLink || null,
+        username,
+        inviteLink,
         isRequired: isRequired !== undefined ? isRequired : true,
         isEnabled: isEnabled !== undefined ? isEnabled : true,
+        sortOrder: nextSortOrder
       }
     })
 
     return NextResponse.json(channel, { status: 201 })
   } catch (error: any) {
     console.error('Error adding forced join channel:', error)
-    return NextResponse.json({ error: 'Failed to add forced join channel' }, { status: 500 })
+    return NextResponse.json({ 
+      error: error.message || 'Failed to add forced join channel' 
+    }, { status: 500 })
   }
 }

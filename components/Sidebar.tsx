@@ -24,7 +24,6 @@ const getSuperAdminMenuItems = (): MenuItem[] => [
   { name: '黑名单管理', href: '/blacklist' },
   { name: '定时发送', href: '/scheduled' },
   { name: '私聊命令管理', href: '/commands' },
-  { name: 'VIP套餐管理', href: '/vip-plans' },
   { name: '订单管理', href: '/orders' },
   { 
     name: '收费管理', 
@@ -55,7 +54,6 @@ const getAdminMenuItems = (): MenuItem[] => [
   { name: '黑名单管理', href: '/blacklist' },
   { name: '定时发送', href: '/scheduled' },
   { name: '私聊命令管理', href: '/commands' },
-  { name: 'VIP套餐管理', href: '/vip-plans' },
   { name: '订单管理', href: '/orders' },
 ]
 

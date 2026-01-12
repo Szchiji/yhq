@@ -59,46 +59,38 @@ model User {
   updatedAt         DateTime  @updatedAt
   
   // 关联
-  groups            UserGroup[]
-  forcedJoins       ForcedJoinChannel[]
   scheduledMessages ScheduledMessage[]
   paymentAddresses  PaymentAddress[]
   winners           Winner[]
 }
 
-// 已加入的群/频道
-model UserGroup {
+// 已加入的群/频道 (系统级别，不绑定用户)
+model JoinedGroup {
   id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  chatId      String
+  chatId      String   @unique
   title       String
-  type        String   // group, supergroup, channel
+  type        String   // group / supergroup / channel
   username    String?
   memberCount Int      @default(0)
-  status      String   @default("active") // active, left, kicked
+  inviteLink  String?
+  status      String   @default("active") // active / left / kicked
   joinedAt    DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  @@unique([userId, chatId])
 }
 
-// 强制加入群/频道
+// 强制加入群/频道 (系统级别，不绑定用户)
 model ForcedJoinChannel {
   id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  chatId      String
+  chatId      String   @unique
   title       String
-  type        String   // group, channel
+  type        String   // group / supergroup / channel
   username    String?
   inviteLink  String?
-  isRequired  Boolean  @default(true)
-  isEnabled   Boolean  @default(true)
+  isRequired  Boolean  @default(true)  // 是否必须加入
+  isEnabled   Boolean  @default(true)  // 是否启用
+  sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  @@unique([userId, chatId])
 }
 
 // 定时发送消息
@@ -340,38 +332,6 @@ model SystemSetting {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
-}
-
-// VIP套餐
-model VipPlan {
-  id          String     @id @default(cuid())
-  name        String
-  days        Int        // -1 表示永久
-  price       Decimal    @db.Decimal(10, 2)
-  currency    String     @default("USDT")
-  description String?
-  isEnabled   Boolean    @default(true)
-  sortOrder   Int        @default(0)
-  createdAt   DateTime   @default(now())
-  createdBy   String
-  orders      VipOrder[]
-}
-
-// VIP订单
-model VipOrder {
-  id         String    @id @default(cuid())
-  orderNo    String    @unique
-  telegramId String
-  planId     String
-  plan       VipPlan   @relation(fields: [planId], references: [id])
-  amount     Decimal   @db.Decimal(10, 2)
-  currency   String
-  status     String    @default("pending") // pending, paid, cancelled
-  paidAt     DateTime?
-  expireAt   DateTime?
-  remark     String?
-  createdAt  DateTime  @default(now())
-  createdBy  String
 }
 
 // 黑名单
