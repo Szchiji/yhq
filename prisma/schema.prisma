@@ -373,3 +373,14 @@ model VipOrder {
   createdAt  DateTime  @default(now())
   createdBy  String
 }
+
+// 黑名单
+model Blacklist {
+  id          String   @id @default(cuid())
+  telegramId  String   @unique
+  username    String?
+  reason      String?
+  createdBy   String   // 操作管理员的 Telegram ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

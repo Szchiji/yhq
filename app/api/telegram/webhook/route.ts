@@ -89,6 +89,8 @@ export async function POST(request: NextRequest) {
               await sendMessage(chatId, result.message || '参与此抽奖需要设置 Telegram 用户名')
             } else if (result.error === 'Channel membership required') {
               await sendMessage(chatId, result.message || '参与此抽奖需要加入指定的频道/群组')
+            } else if (result.error === 'Blacklisted') {
+              await sendMessage(chatId, result.message || '❌ 您已被加入黑名单，无法参与抽奖。如有疑问请联系管理员。')
             } else {
               await sendMessage(chatId, '参与抽奖失败，请稍后重试')
             }
