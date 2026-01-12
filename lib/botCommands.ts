@@ -254,7 +254,7 @@ export async function handleShowLotteries(
       const prizeNames =
         lottery.prizes.map((p) => p.name).join('、') || '神秘奖品'
       const participantCount = lottery._count?.participants || 0
-      const maxParticipants = lottery.drawCount || '不限'
+      const drawCondition = lottery.drawCount || '不限'
       
       // Format end time based on draw type
       let endTimeStr = ''
@@ -271,7 +271,7 @@ export async function handleShowLotteries(
 
       message += `${index + 1}️⃣ <b>${lottery.title}</b>\n`
       message += `   奖品：${prizeNames}\n`
-      message += `   参与：${participantCount}/${maxParticipants}\n`
+      message += `   参与：${participantCount}/${drawCondition}\n`
       if (endTimeStr) {
         message += `   截止：${endTimeStr}\n`
       }

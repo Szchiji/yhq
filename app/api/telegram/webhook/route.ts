@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     // Handle callback_query (button clicks)
     if (body.callback_query) {
       const callbackQuery = body.callback_query
-      const data = callbackQuery.data
+      let data = callbackQuery.data
       const chatId = callbackQuery.message.chat.id
       const userId = callbackQuery.from.id.toString()
       const username = callbackQuery.from.username
@@ -75,9 +75,8 @@ export async function POST(request: NextRequest) {
       // Handle join_lottery_ callback (from lottery list)
       if (data.startsWith('join_lottery_')) {
         const lotteryId = data.replace('join_lottery_', '')
-        // Reuse the same join logic as join_
-        const joinData = `join_${lotteryId}`
-        // Set data to the join format so it falls through to the handler below
+        // Process the same as join_ by modifying data
+        data = `join_${lotteryId}`
       }
 
       if (data.startsWith('join_')) {
