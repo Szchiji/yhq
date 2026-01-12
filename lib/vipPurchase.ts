@@ -196,8 +196,8 @@ export async function handlePaymentProof(
       return
     }
 
-    // 生成订单号
-    const orderNo = `ORD${Date.now()}`
+    // 生成订单号 - 使用时间戳+随机字符串确保唯一性
+    const orderNo = `ORD${Date.now()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`
 
     // 创建订单
     const order = await prisma.order.create({
