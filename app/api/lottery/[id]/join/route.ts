@@ -84,6 +84,18 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
 
+    // 检查全局强制加入群/频道
+    const { checkForcedJoin } = await import('@/lib/forcedJoin')
+    const forcedJoinResult = await checkForcedJoin(telegramId)
+
+    if (!forcedJoinResult.passed) {
+      return NextResponse.json({ 
+        error: 'Forced join required',
+        message: `参与抽奖需要先加入以下群/频道：\n${forcedJoinResult.missingChannels.map(c => c.title).join('、')}`,
+        missingChannels: forcedJoinResult.missingChannels
+      }, { status: 400 })
+    }
+
     // 检查每日参与限制
     const { getSetting } = await import('@/lib/settings')
     const limitEnabled = (await getSetting('lottery_limit_enabled')) === 'true'
