@@ -15,7 +15,7 @@ function calculateExpireAt(days: number): Date | null {
 }
 
 /**
- * 通知管理员新订单
+ * 通知超级管理员新订单（使用 WebApp 按钮打开后台管理页面）
  */
 export async function notifyAdminNewOrder(
   order: any,
@@ -29,6 +29,7 @@ export async function notifyAdminNewOrder(
       return
     }
 
+    const webappUrl = process.env.WEBAPP_URL || ''
     const roleNames: Record<string, string> = { 
       user: '普通用户', 
       vip: 'VIP会员', 
@@ -41,16 +42,16 @@ export async function notifyAdminNewOrder(
     message += `用户：${displayName} (${order.userId})\n`
     message += `套餐：${order.ruleName}\n`
     message += `金额：${order.amount} ${order.currency}\n`
-    message += `权限：${roleNames[order.targetRole] || order.targetRole}\n\n`
-    message += `付款凭证：${order.paymentProof || '无'}\n`
+    message += `权限：${roleNames[order.targetRole] || order.targetRole}\n`
+    message += `付款凭证：${order.paymentProof || '无'}\n\n`
+    message += `请前往后台「订单管理」页面处理。`
 
     await sendMessage(superAdminId, message, {
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '✅ 确认订单', callback_data: `confirm_order_${order.id}` },
-            { text: '❌ 拒绝订单', callback_data: `reject_order_${order.id}` }
+            { text: '📋 打开订单管理', web_app: { url: `${webappUrl}/orders` } }
           ]
         ]
       }
@@ -224,7 +225,7 @@ export async function handleRejectOrder(
     })
 
     // 通知用户
-    await notifyUserOrderRejected(order)
+    await notifyUserOrderRejected(order, '未收到付款或付款金额不符')
 
     // 回复管理员
     await answerCallbackQuery(callbackQueryId, '✅ 订单已拒绝')
@@ -239,7 +240,7 @@ export async function handleRejectOrder(
 /**
  * 通知用户订单确认
  */
-async function notifyUserOrderConfirmed(order: any) {
+export async function notifyUserOrderConfirmed(order: any) {
   try {
     const roleNames: Record<string, string> = { 
       user: '普通用户', 
@@ -268,11 +269,11 @@ async function notifyUserOrderConfirmed(order: any) {
 /**
  * 通知用户订单被拒绝
  */
-async function notifyUserOrderRejected(order: any) {
+export async function notifyUserOrderRejected(order: any, reason?: string) {
   try {
     let message = `❌ <b>订单未通过</b>\n\n`
     message += `订单号：<code>${order.orderNo}</code>\n`
-    message += `原因：未收到付款或付款金额不符\n\n`
+    message += `原因：${reason || '未收到付款或付款金额不符'}\n\n`
     message += `如有疑问请联系管理员。`
 
     await sendMessage(order.userId, message, { parse_mode: 'HTML' })

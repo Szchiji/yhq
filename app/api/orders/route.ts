@@ -3,21 +3,33 @@ import { prisma } from '@/lib/prisma'
 import { parseTelegramUser, validateTelegramWebAppData } from '@/lib/telegram'
 import { isAdmin } from '@/lib/auth'
 
-// GET - 获取所有订单
+// GET - 获取所有订单（支持搜索和筛选）
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
-    const perPage = parseInt(searchParams.get('perPage') || '20')
+    const perPage = parseInt(searchParams.get('limit') || '20')
     const status = searchParams.get('status')
+    const search = searchParams.get('search') || ''
     
     const where: any = {}
-    if (status) {
+    
+    // Status filter (all/pending/confirmed/rejected)
+    if (status && status !== 'all') {
       where.status = status
+    }
+    
+    // Search filter (orderNo, username, userId)
+    if (search) {
+      where.OR = [
+        { orderNo: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } },
+        { userId: { contains: search } }
+      ]
     }
 
     const [orders, total] = await Promise.all([
-      prisma.paymentOrder.findMany({
+      prisma.order.findMany({
         where,
         orderBy: {
           createdAt: 'desc',
@@ -25,17 +37,14 @@ export async function GET(request: NextRequest) {
         skip: (page - 1) * perPage,
         take: perPage,
       }),
-      prisma.paymentOrder.count({ where }),
+      prisma.order.count({ where }),
     ])
 
     return NextResponse.json({
       data: orders,
-      pagination: {
-        page,
-        perPage,
-        total,
-        totalPages: Math.ceil(total / perPage),
-      },
+      total,
+      page,
+      limit: perPage,
     })
   } catch (error) {
     console.error('Error fetching orders:', error)
