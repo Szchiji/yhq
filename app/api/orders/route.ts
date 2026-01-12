@@ -17,18 +17,15 @@ export async function GET(request: NextRequest) {
     }
 
     const [orders, total] = await Promise.all([
-      prisma.vipOrder.findMany({
+      prisma.paymentOrder.findMany({
         where,
-        include: {
-          plan: true,
-        },
         orderBy: {
           createdAt: 'desc',
         },
         skip: (page - 1) * perPage,
         take: perPage,
       }),
-      prisma.vipOrder.count({ where }),
+      prisma.paymentOrder.count({ where }),
     ])
 
     return NextResponse.json({
@@ -75,35 +72,32 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证必需字段
-    if (!order.telegramId || !order.planId) {
+    if (!order.telegramId || !order.ruleId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // 获取套餐信息
-    const plan = await prisma.vipPlan.findUnique({
-      where: { id: order.planId },
+    // 获取续费规则信息
+    const rule = await prisma.renewalRule.findUnique({
+      where: { id: order.ruleId },
     })
 
-    if (!plan || !plan.isEnabled) {
-      return NextResponse.json({ error: 'VIP plan not found or disabled' }, { status: 404 })
+    if (!rule || !rule.isEnabled) {
+      return NextResponse.json({ error: 'Renewal rule not found or disabled' }, { status: 404 })
     }
 
     // 生成订单号
-    const orderNo = `VIP${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+    const orderNo = `ORDER${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
     // 创建订单
-    const newOrder = await prisma.vipOrder.create({
+    const newOrder = await prisma.paymentOrder.create({
       data: {
         orderNo,
         telegramId: order.telegramId,
-        planId: order.planId,
-        amount: plan.price,
-        currency: plan.currency,
+        orderType: `${rule.targetRole}_renewal`,
+        ruleId: order.ruleId,
+        amount: rule.price,
+        currency: rule.currency,
         status: 'pending',
-        createdBy: user.id.toString(),
-      },
-      include: {
-        plan: true,
       },
     })
 

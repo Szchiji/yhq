@@ -47,7 +47,7 @@ export async function PUT(
     if (memberCount !== undefined) updateData.memberCount = memberCount
     if (status !== undefined) updateData.status = status
 
-    const group = await prisma.userGroup.update({
+    const group = await prisma.joinedGroup.update({
       where: { id: params.id },
       data: updateData
     })
@@ -97,7 +97,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 })
     }
 
-    await prisma.userGroup.delete({
+    await prisma.joinedGroup.delete({
       where: { id: params.id }
     })
 

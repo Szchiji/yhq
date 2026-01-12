@@ -103,48 +103,48 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // Handle VIP plan selection
-      if (data.startsWith('vip_plan_')) {
-        const planId = data.replace('vip_plan_', '')
+      // Handle renewal rule selection (replacing VIP plan)
+      if (data.startsWith('renewal_rule_')) {
+        const ruleId = data.replace('renewal_rule_', '')
         
         try {
-          const plan = await prisma.vipPlan.findUnique({
-            where: { id: planId }
+          const rule = await prisma.renewalRule.findUnique({
+            where: { id: ruleId }
           })
           
-          if (!plan || !plan.isEnabled) {
+          if (!rule || !rule.isEnabled) {
             await answerCallbackQuery(callbackQuery.id, '该套餐已下架')
             return NextResponse.json({ ok: true })
           }
           
           // Create order
-          const orderNo = `VIP${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+          const orderNo = `ORDER${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
           
-          const order = await prisma.vipOrder.create({
+          const order = await prisma.paymentOrder.create({
             data: {
               orderNo,
               telegramId: userId,
-              planId: plan.id,
-              amount: plan.price,
-              currency: plan.currency,
+              orderType: `${rule.targetRole}_renewal`,
+              ruleId: rule.id,
+              amount: rule.price,
+              currency: rule.currency,
               status: 'pending',
-              createdBy: userId,
             }
           })
           
           await answerCallbackQuery(callbackQuery.id, '订单已创建')
           
-          let message = `📋 VIP订单详情\n\n`
+          let message = `📋 续费订单详情\n\n`
           message += `订单号：${order.orderNo}\n`
-          message += `套餐：${plan.name}\n`
-          message += `时长：${plan.days === -1 ? '永久' : `${plan.days}天`}\n`
-          message += `金额：${plan.price} ${plan.currency}\n\n`
-          message += `💰 请联系管理员完成支付并激活VIP。\n`
+          message += `套餐：${rule.name}\n`
+          message += `时长：${rule.days === -1 ? '永久' : `${rule.days}天`}\n`
+          message += `金额：${rule.price} ${rule.currency}\n\n`
+          message += `💰 请联系管理员完成支付并激活。\n`
           message += `请提供订单号：${order.orderNo}`
           
           await sendMessage(chatId, message)
         } catch (error) {
-          console.error('Error creating VIP order:', error)
+          console.error('Error creating renewal order:', error)
           await answerCallbackQuery(callbackQuery.id, '创建订单失败')
           await sendMessage(chatId, '创建订单失败，请稍后重试')
         }
@@ -765,16 +765,19 @@ export async function POST(request: NextRequest) {
         message += '• 无限参与抽奖\n'
         message += '• 推送到群/频道\n'
         
-        // Get enabled VIP plans
-        const plans = await prisma.vipPlan.findMany({
-          where: { isEnabled: true },
+        // Get enabled renewal rules for VIP
+        const rules = await prisma.renewalRule.findMany({
+          where: { 
+            isEnabled: true,
+            targetRole: 'vip'
+          },
           orderBy: { sortOrder: 'asc' }
         })
         
-        if (plans.length > 0) {
-          const buttons = plans.map(plan => [{
-            text: `🛒 ${plan.name} ${plan.price} ${plan.currency}`,
-            callback_data: `vip_plan_${plan.id}`
+        if (rules.length > 0) {
+          const buttons = rules.map(rule => [{
+            text: `🛒 ${rule.name} ${rule.price} ${rule.currency}`,
+            callback_data: `renewal_rule_${rule.id}`
           }])
           
           await sendMessage(chatId, message, {

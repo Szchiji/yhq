@@ -10,7 +10,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
-    const { title, type, username, inviteLink, isRequired, isEnabled } = body
+    const { title, type, username, inviteLink, isRequired, isEnabled, sortOrder } = body
     
     // Get initData from header
     const initData = request.headers.get('x-telegram-init-data')
@@ -47,6 +47,7 @@ export async function PUT(
     if (inviteLink !== undefined) updateData.inviteLink = inviteLink
     if (isRequired !== undefined) updateData.isRequired = isRequired
     if (isEnabled !== undefined) updateData.isEnabled = isEnabled
+    if (sortOrder !== undefined) updateData.sortOrder = sortOrder
 
     const channel = await prisma.forcedJoinChannel.update({
       where: { id: params.id },
@@ -111,72 +112,5 @@ export async function DELETE(
     }
     
     return NextResponse.json({ error: 'Failed to delete forced join channel' }, { status: 500 })
-  }
-}
-
-// POST - 切换启用/停用状态
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const body = await request.json()
-    const { action } = body
-    
-    if (action !== 'toggle') {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-    }
-
-    // Get initData from header
-    const initData = request.headers.get('x-telegram-init-data')
-    
-    if (!initData) {
-      return NextResponse.json({ error: 'Missing initData' }, { status: 400 })
-    }
-
-    // 验证 Telegram WebApp 数据
-    const botToken = process.env.BOT_TOKEN
-    if (!botToken) {
-      return NextResponse.json({ error: 'Bot token not configured' }, { status: 500 })
-    }
-
-    if (!validateTelegramWebAppData(initData, botToken)) {
-      return NextResponse.json({ error: 'Invalid Telegram data' }, { status: 401 })
-    }
-
-    const user = parseTelegramUser(initData)
-    if (!user) {
-      return NextResponse.json({ error: 'Invalid user data' }, { status: 401 })
-    }
-
-    // 验证用户是否为管理员
-    if (!(await isAdmin(user.id.toString()))) {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 })
-    }
-
-    // Get current state
-    const channel = await prisma.forcedJoinChannel.findUnique({
-      where: { id: params.id }
-    })
-
-    if (!channel) {
-      return NextResponse.json({ error: 'Channel not found' }, { status: 404 })
-    }
-
-    // Toggle enabled status
-    const updated = await prisma.forcedJoinChannel.update({
-      where: { id: params.id },
-      data: { isEnabled: !channel.isEnabled }
-    })
-
-    return NextResponse.json(updated)
-  } catch (error: any) {
-    console.error('Error toggling forced join channel:', error)
-    
-    if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Channel not found' }, { status: 404 })
-    }
-    
-    return NextResponse.json({ error: 'Failed to toggle forced join channel' }, { status: 500 })
   }
 }

@@ -1,31 +1,66 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import DataTable from '@/components/DataTable'
 
 type ForcedJoinGroup = {
-  id: number
-  name: string
+  id: string
   chatId: string
-  inviteLink: string
-  type: 'group' | 'channel'
+  title: string
+  type: string
+  username?: string | null
+  inviteLink?: string | null
   isRequired: boolean
-  status: string
+  isEnabled: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
 }
 
 export default function ForcedJoinPage() {
   const [groups, setGroups] = useState<ForcedJoinGroup[]>([])
+  const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [newGroup, setNewGroup] = useState({
-    name: '',
-    chatId: '',
-    inviteLink: '',
-    type: 'channel' as 'group' | 'channel',
-    isRequired: true,
-  })
+  const [newChatId, setNewChatId] = useState('')
+  const [isRequired, setIsRequired] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchGroups = async () => {
+    try {
+      setLoading(true)
+      const initData = (window as any).Telegram?.WebApp?.initData
+      if (!initData) {
+        throw new Error('Telegram WebApp not initialized')
+      }
+
+      const response = await fetch('/api/forced-join', {
+        headers: {
+          'x-telegram-init-data': initData
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch forced join channels')
+      }
+
+      const result = await response.json()
+      setGroups(result.data || [])
+      setError(null)
+    } catch (err) {
+      console.error('Error fetching forced join channels:', err)
+      setError('Failed to load forced join channels')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchGroups()
+  }, [])
 
   const columns = [
-    { key: 'name', label: '名称' },
+    { key: 'title', label: '名称' },
     { 
       key: 'chatId', 
       label: 'Chat ID',
@@ -40,7 +75,7 @@ export default function ForcedJoinPage() {
         <span className={`px-2 py-0.5 rounded text-xs ${
           item.type === 'channel' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
         }`}>
-          {item.type === 'channel' ? '频道' : '群组'}
+          {item.type === 'channel' ? '频道' : item.type === 'supergroup' ? '超级群' : '群组'}
         </span>
       ),
     },
@@ -56,14 +91,22 @@ export default function ForcedJoinPage() {
       ),
     },
     {
-      key: 'status',
+      key: 'isEnabled',
       label: '状态',
       render: (item: ForcedJoinGroup) => (
-        <span className={`px-2 py-0.5 rounded text-xs ${
-          item.status === '启用' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-        }`}>
-          {item.status}
-        </span>
+        <label className="flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={item.isEnabled}
+            onChange={() => handleToggle(item.id, item.isEnabled)}
+            className="mr-2"
+          />
+          <span className={`px-2 py-0.5 rounded text-xs ${
+            item.isEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+          }`}>
+            {item.isEnabled ? '启用' : '停用'}
+          </span>
+        </label>
       ),
     },
     {
@@ -71,9 +114,8 @@ export default function ForcedJoinPage() {
       label: '操作',
       render: (item: ForcedJoinGroup) => (
         <div className="flex gap-2">
-          <button className="text-blue-500 hover:text-blue-700 text-xs sm:text-sm">编辑</button>
           <button
-            onClick={() => setGroups(groups.filter((g) => g.id !== item.id))}
+            onClick={() => handleDelete(item.id)}
             className="text-red-500 hover:text-red-700 text-xs sm:text-sm"
           >
             删除
@@ -83,18 +125,103 @@ export default function ForcedJoinPage() {
     },
   ]
 
-  const addGroup = () => {
-    if (newGroup.name && newGroup.chatId) {
-      setGroups([
-        ...groups,
-        {
-          id: Date.now(),
-          ...newGroup,
-          status: '启用',
+  const handleToggle = async (id: string, currentEnabled: boolean) => {
+    try {
+      const initData = (window as any).Telegram?.WebApp?.initData
+      if (!initData) {
+        throw new Error('Telegram WebApp not initialized')
+      }
+
+      const response = await fetch(`/api/forced-join/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-telegram-init-data': initData
         },
-      ])
-      setNewGroup({ name: '', chatId: '', inviteLink: '', type: 'channel', isRequired: true })
+        body: JSON.stringify({ isEnabled: !currentEnabled })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to toggle channel')
+      }
+
+      await fetchGroups()
+    } catch (err) {
+      console.error('Error toggling channel:', err)
+      alert('切换状态失败，请重试')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('确定要删除这个强制加入群/频道吗？')) {
+      return
+    }
+
+    try {
+      const initData = (window as any).Telegram?.WebApp?.initData
+      if (!initData) {
+        throw new Error('Telegram WebApp not initialized')
+      }
+
+      const response = await fetch(`/api/forced-join/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-telegram-init-data': initData
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete channel')
+      }
+
+      await fetchGroups()
+    } catch (err) {
+      console.error('Error deleting channel:', err)
+      alert('删除失败，请重试')
+    }
+  }
+
+  const addGroup = async () => {
+    if (!newChatId.trim()) {
+      alert('请输入 Chat ID')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      const initData = (window as any).Telegram?.WebApp?.initData
+      if (!initData) {
+        throw new Error('Telegram WebApp not initialized')
+      }
+
+      const response = await fetch('/api/forced-join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-telegram-init-data': initData
+        },
+        body: JSON.stringify({ 
+          chatId: newChatId.trim(),
+          isRequired,
+          isEnabled: true
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to add channel')
+      }
+
+      setNewChatId('')
+      setIsRequired(true)
       setShowAddModal(false)
+      await fetchGroups()
+    } catch (err: any) {
+      console.error('Error adding channel:', err)
+      alert(err.message || '添加失败，请检查 Chat ID 是否正确，并确保机器人已加入该群/频道')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -116,7 +243,20 @@ export default function ForcedJoinPage() {
         </p>
       </div>
 
-      <DataTable columns={columns} data={groups} emptyMessage="暂无强制加入群/频道" />
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
+          <p className="text-xs sm:text-sm text-red-800">{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <p className="mt-2 text-sm text-gray-600">加载中...</p>
+        </div>
+      ) : (
+        <DataTable columns={columns} data={groups} emptyMessage="暂无强制加入群/频道" />
+      )}
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -125,60 +265,28 @@ export default function ForcedJoinPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  名称
-                </label>
-                <input
-                  type="text"
-                  value={newGroup.name}
-                  onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="群组/频道名称"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   Chat ID
                 </label>
                 <input
                   type="text"
-                  value={newGroup.chatId}
-                  onChange={(e) => setNewGroup({ ...newGroup, chatId: e.target.value })}
+                  value={newChatId}
+                  onChange={(e) => setNewChatId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="例如：-100123456789"
+                  placeholder="例如：-100123456789 或 @username"
+                  disabled={submitting}
                 />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  邀请链接
-                </label>
-                <input
-                  type="text"
-                  value={newGroup.inviteLink}
-                  onChange={(e) => setNewGroup({ ...newGroup, inviteLink: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="https://t.me/+xxx 或 @username"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  类型
-                </label>
-                <select
-                  value={newGroup.type}
-                  onChange={(e) => setNewGroup({ ...newGroup, type: e.target.value as 'group' | 'channel' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value="channel">频道</option>
-                  <option value="group">群组</option>
-                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  系统将自动获取群组名称、类型、邀请链接等信息
+                </p>
               </div>
               <div>
                 <label className="flex items-center text-xs sm:text-sm">
                   <input
                     type="checkbox"
-                    checked={newGroup.isRequired}
-                    onChange={(e) => setNewGroup({ ...newGroup, isRequired: e.target.checked })}
+                    checked={isRequired}
+                    onChange={(e) => setIsRequired(e.target.checked)}
                     className="mr-2"
+                    disabled={submitting}
                   />
                   <span className="text-gray-700">必须加入才能参与抽奖</span>
                 </label>
@@ -187,15 +295,17 @@ export default function ForcedJoinPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                disabled={submitting}
+                className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm disabled:opacity-50"
               >
                 取消
               </button>
               <button
                 onClick={addGroup}
-                className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                disabled={submitting}
+                className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm disabled:opacity-50"
               >
-                确认
+                {submitting ? '添加中...' : '确认'}
               </button>
             </div>
           </div>
