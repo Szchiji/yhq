@@ -63,6 +63,7 @@ model User {
   forcedJoins       ForcedJoinChannel[]
   scheduledMessages ScheduledMessage[]
   paymentAddresses  PaymentAddress[]
+  winners           Winner[]
 }
 
 // 已加入的群/频道
@@ -245,6 +246,7 @@ model Prize {
   total       Int
   remaining   Int
   createdAt   DateTime @default(now())
+  winners     Winner[]
 }
 
 // 参与者
@@ -265,16 +267,23 @@ model Participant {
 
 // 中奖者
 model Winner {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   lotteryId   String
-  lottery     Lottery  @relation(fields: [lotteryId], references: [id], onDelete: Cascade)
+  lottery     Lottery   @relation(fields: [lotteryId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   telegramId  String
   username    String?
   firstName   String?
   prizeId     String
+  prize       Prize     @relation(fields: [prizeId], references: [id], onDelete: Cascade)
   prizeName   String
-  notified    Boolean  @default(false)
-  wonAt       DateTime @default(now())
+  notified    Boolean   @default(false)
+  claimed     Boolean   @default(false)
+  claimedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  wonAt       DateTime  @default(now())
 }
 
 // 推送记录
