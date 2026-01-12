@@ -119,6 +119,7 @@ model PaymentAddress {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String   // 地址名称，如"USDT-TRC20"
+  currency    String   @default("USDT") // 货币类型：USDT, BTC, ETH等
   network     String   // 网络类型：TRC20, ERC20, BEP20等
   address     String   // 收款地址
   qrCodeUrl   String?  // 二维码图片URL
@@ -167,6 +168,29 @@ model PaymentOrder {
   remark      String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// 用户购买订单（完整付款流程）
+model Order {
+  id            String    @id @default(cuid())
+  orderNo       String    @unique  // 订单号 ORD + 时间戳
+  userId        String    // Telegram ID
+  username      String?   // Telegram username
+  firstName     String?   // Telegram first name
+  ruleId        String    // 关联的续费规则ID
+  ruleName      String    // 套餐名称
+  amount        String    // 金额
+  currency      String    // 货币
+  targetRole    String    // user / vip / admin
+  days          Int       // 天数，-1表示永久
+  paymentProof  String?   // 付款凭证（TxHash 或图片URL）
+  status        String    @default("pending")  // pending / confirmed / rejected
+  confirmedAt   DateTime?
+  confirmedBy   String?   // 确认人的 telegramId
+  rejectedAt    DateTime?
+  rejectReason  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 // 抽奖活动
