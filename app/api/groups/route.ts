@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     const chatInfo = await getChat(chatId)
     if (!chatInfo.ok) {
       return NextResponse.json({ 
-        error: `Failed to get chat info: ${chatInfo.description || 'Unknown error'}` 
+        error: 'Invalid chat ID or bot not authorized to access this chat' 
       }, { status: 400 })
     }
 

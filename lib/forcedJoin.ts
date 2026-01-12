@@ -26,7 +26,8 @@ export async function checkForcedJoin(userId: string): Promise<{
         
         // 检查用户是否是成员
         const isMember = memberInfo.ok && 
-          ['member', 'administrator', 'creator'].includes(memberInfo.result?.status)
+          memberInfo.result && 
+          ['member', 'administrator', 'creator'].includes(memberInfo.result.status)
 
         // 如果不是成员且该频道是必须的
         if (!isMember && channel.isRequired) {

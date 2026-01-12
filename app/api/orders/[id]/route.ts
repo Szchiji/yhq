@@ -59,6 +59,16 @@ export async function PATCH(
         rule = await prisma.renewalRule.findUnique({
           where: { id: order.ruleId }
         })
+        
+        if (!rule) {
+          return NextResponse.json({ 
+            error: 'Renewal rule not found' 
+          }, { status: 404 })
+        }
+      } else {
+        return NextResponse.json({ 
+          error: 'Order has no associated renewal rule' 
+        }, { status: 400 })
       }
 
       // 更新订单状态
@@ -72,82 +82,80 @@ export async function PATCH(
       })
 
       // 根据订单类型更新用户状态
-      if (rule) {
-        let expireAt: Date | null = null
+      let expireAt: Date | null = null
 
-        if (rule.days === -1) {
-          // 永久
-          expireAt = new Date('2099-12-31')
-        } else {
-          // 计算到期时间
-          expireAt = new Date(now.getTime() + rule.days * 24 * 60 * 60 * 1000)
+      if (rule.days === -1) {
+        // 永久
+        expireAt = new Date('2099-12-31')
+      } else {
+        // 计算到期时间
+        expireAt = new Date(now.getTime() + rule.days * 24 * 60 * 60 * 1000)
+      }
+
+      const existingUser = await prisma.user.findUnique({
+        where: { telegramId: order.telegramId },
+      })
+
+      if (existingUser) {
+        // 根据 targetRole 更新不同的字段
+        const updateData: any = {}
+        
+        if (rule.targetRole === 'vip') {
+          let newExpireAt = expireAt
+          if (existingUser.isVip && existingUser.vipExpireAt && rule.days !== -1) {
+            const currentExpire = new Date(existingUser.vipExpireAt)
+            if (currentExpire > now) {
+              newExpireAt = new Date(currentExpire.getTime() + rule.days * 24 * 60 * 60 * 1000)
+            }
+          }
+          updateData.isVip = true
+          updateData.vipExpireAt = newExpireAt
+        } else if (rule.targetRole === 'admin') {
+          let newExpireAt = expireAt
+          if (existingUser.isAdmin && existingUser.adminExpireAt && rule.days !== -1) {
+            const currentExpire = new Date(existingUser.adminExpireAt)
+            if (currentExpire > now) {
+              newExpireAt = new Date(currentExpire.getTime() + rule.days * 24 * 60 * 60 * 1000)
+            }
+          }
+          updateData.isAdmin = true
+          updateData.adminExpireAt = newExpireAt
+        } else if (rule.targetRole === 'user') {
+          let newExpireAt = expireAt
+          if (existingUser.isPaid && existingUser.paidExpireAt && rule.days !== -1) {
+            const currentExpire = new Date(existingUser.paidExpireAt)
+            if (currentExpire > now) {
+              newExpireAt = new Date(currentExpire.getTime() + rule.days * 24 * 60 * 60 * 1000)
+            }
+          }
+          updateData.isPaid = true
+          updateData.paidExpireAt = newExpireAt
         }
 
-        const existingUser = await prisma.user.findUnique({
+        await prisma.user.update({
           where: { telegramId: order.telegramId },
+          data: updateData,
         })
-
-        if (existingUser) {
-          // 根据 targetRole 更新不同的字段
-          const updateData: any = {}
-          
-          if (rule.targetRole === 'vip') {
-            let newExpireAt = expireAt
-            if (existingUser.isVip && existingUser.vipExpireAt && rule.days !== -1) {
-              const currentExpire = new Date(existingUser.vipExpireAt)
-              if (currentExpire > now) {
-                newExpireAt = new Date(currentExpire.getTime() + rule.days * 24 * 60 * 60 * 1000)
-              }
-            }
-            updateData.isVip = true
-            updateData.vipExpireAt = newExpireAt
-          } else if (rule.targetRole === 'admin') {
-            let newExpireAt = expireAt
-            if (existingUser.isAdmin && existingUser.adminExpireAt && rule.days !== -1) {
-              const currentExpire = new Date(existingUser.adminExpireAt)
-              if (currentExpire > now) {
-                newExpireAt = new Date(currentExpire.getTime() + rule.days * 24 * 60 * 60 * 1000)
-              }
-            }
-            updateData.isAdmin = true
-            updateData.adminExpireAt = newExpireAt
-          } else if (rule.targetRole === 'user') {
-            let newExpireAt = expireAt
-            if (existingUser.isPaid && existingUser.paidExpireAt && rule.days !== -1) {
-              const currentExpire = new Date(existingUser.paidExpireAt)
-              if (currentExpire > now) {
-                newExpireAt = new Date(currentExpire.getTime() + rule.days * 24 * 60 * 60 * 1000)
-              }
-            }
-            updateData.isPaid = true
-            updateData.paidExpireAt = newExpireAt
-          }
-
-          await prisma.user.update({
-            where: { telegramId: order.telegramId },
-            data: updateData,
-          })
-        } else {
-          // 创建新用户
-          const createData: any = {
-            telegramId: order.telegramId,
-          }
-
-          if (rule.targetRole === 'vip') {
-            createData.isVip = true
-            createData.vipExpireAt = expireAt
-          } else if (rule.targetRole === 'admin') {
-            createData.isAdmin = true
-            createData.adminExpireAt = expireAt
-          } else if (rule.targetRole === 'user') {
-            createData.isPaid = true
-            createData.paidExpireAt = expireAt
-          }
-
-          await prisma.user.create({
-            data: createData,
-          })
+      } else {
+        // 创建新用户
+        const createData: any = {
+          telegramId: order.telegramId,
         }
+
+        if (rule.targetRole === 'vip') {
+          createData.isVip = true
+          createData.vipExpireAt = expireAt
+        } else if (rule.targetRole === 'admin') {
+          createData.isAdmin = true
+          createData.adminExpireAt = expireAt
+        } else if (rule.targetRole === 'user') {
+          createData.isPaid = true
+          createData.paidExpireAt = expireAt
+        }
+
+        await prisma.user.create({
+          data: createData,
+        })
       }
 
       return NextResponse.json(updatedOrder)
