@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import DataTable from '@/components/DataTable'
 import { apiGet, apiPut } from '@/lib/api'
 
 const PAGE_SIZE = 20
+const SEARCH_DEBOUNCE_MS = 500
 
 type Order = {
   id: string
@@ -32,15 +33,24 @@ export default function OrdersPage() {
   const [total, setTotal] = useState(0)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [processing, setProcessing] = useState(false)
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
   useEffect(() => {
     fetchOrders()
-  }, [page, statusFilter, searchQuery])
+  }, [page, statusFilter, debouncedSearchQuery])
 
   const fetchOrders = async () => {
     try {
@@ -49,7 +59,7 @@ export default function OrdersPage() {
       params.append('page', page.toString())
       params.append('limit', PAGE_SIZE.toString())
       params.append('status', statusFilter)
-      if (searchQuery) params.append('search', searchQuery)
+      if (debouncedSearchQuery) params.append('search', debouncedSearchQuery)
       
       const response = await apiGet(`/api/orders?${params.toString()}`)
       if (response.ok) {
@@ -151,9 +161,15 @@ export default function OrdersPage() {
     return roles[role] || role
   }
 
-  const pendingCount = orders.filter(o => o.status === 'pending').length
-  const confirmedCount = orders.filter(o => o.status === 'confirmed').length
-  const rejectedCount = orders.filter(o => o.status === 'rejected').length
+  // Calculate status counts efficiently using useMemo
+  const statusCounts = useMemo(() => {
+    return orders.reduce((acc, order) => {
+      if (order.status === 'pending') acc.pending++
+      else if (order.status === 'confirmed') acc.confirmed++
+      else if (order.status === 'rejected') acc.rejected++
+      return acc
+    }, { pending: 0, confirmed: 0, rejected: 0 })
+  }, [orders])
 
   const columns = [
     { 
@@ -271,7 +287,7 @@ export default function OrdersPage() {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              待确认 {pendingCount > 0 && `(${pendingCount})`}
+              待确认 {statusCounts.pending > 0 && `(${statusCounts.pending})`}
             </button>
             <button
               onClick={() => { setStatusFilter('confirmed'); setPage(1) }}
@@ -316,19 +332,19 @@ export default function OrdersPage() {
         </div>
         <div className="bg-white rounded-lg shadow p-3 sm:p-4 text-center">
           <div className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600">
-            {pendingCount}
+            {statusCounts.pending}
           </div>
           <div className="text-xs sm:text-sm text-gray-600">待确认</div>
         </div>
         <div className="bg-white rounded-lg shadow p-3 sm:p-4 text-center">
           <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
-            {confirmedCount}
+            {statusCounts.confirmed}
           </div>
           <div className="text-xs sm:text-sm text-gray-600">已确认</div>
         </div>
         <div className="bg-white rounded-lg shadow p-3 sm:p-4 text-center">
           <div className="text-lg sm:text-xl md:text-2xl font-bold text-red-600">
-            {rejectedCount}
+            {statusCounts.rejected}
           </div>
           <div className="text-xs sm:text-sm text-gray-600">已拒绝</div>
         </div>

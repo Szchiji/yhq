@@ -21,19 +21,21 @@ function calculateExpireAt(days: number): Date | null {
  * 创建或更新管理员记录
  */
 async function createOrUpdateAdmin(
-  telegramId: string,
-  username: string | null,
-  firstName: string | null,
-  lastName: string | null,
+  userId: string,
+  userData: {
+    username: string | null
+    firstName: string | null
+    lastName?: string | null
+  },
   adminId: string
 ) {
   await prisma.admin.upsert({
-    where: { telegramId },
+    where: { telegramId: userId },
     create: {
-      telegramId,
-      username: username || null,
-      firstName: firstName || null,
-      lastName: lastName || null,
+      telegramId: userId,
+      username: userData.username || null,
+      firstName: userData.firstName || null,
+      lastName: userData.lastName || null,
       isActive: true,
       createdBy: adminId
     },
@@ -145,9 +147,11 @@ export async function PUT(
         if (existingUser) {
           await createOrUpdateAdmin(
             order.userId,
-            existingUser.username,
-            existingUser.firstName,
-            existingUser.lastName,
+            {
+              username: existingUser.username,
+              firstName: existingUser.firstName,
+              lastName: existingUser.lastName
+            },
             adminId
           )
           
@@ -174,9 +178,10 @@ export async function PUT(
           // 创建管理员记录
           await createOrUpdateAdmin(
             order.userId,
-            order.username,
-            order.firstName,
-            null,
+            {
+              username: order.username,
+              firstName: order.firstName
+            },
             adminId
           )
         }
