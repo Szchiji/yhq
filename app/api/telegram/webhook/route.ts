@@ -151,6 +151,46 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
+      // Handle buy_rule_ callback - select package
+      if (data.startsWith('buy_rule_')) {
+        const ruleId = data.replace('buy_rule_', '')
+        const { handleSelectRule } = await import('@/lib/vipPurchase')
+        await handleSelectRule(String(chatId), userId, ruleId, callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle paid_ callback - user clicked "I have paid"
+      if (data.startsWith('paid_')) {
+        const ruleId = data.replace('paid_', '')
+        const { handlePaidClick } = await import('@/lib/vipPurchase')
+        await handlePaidClick(String(chatId), userId, ruleId, callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle cancel_order callback
+      if (data === 'cancel_order') {
+        const { handleCancelOrder } = await import('@/lib/vipPurchase')
+        await handleCancelOrder(String(chatId), callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle confirm_order_ callback - admin confirms order
+      if (data.startsWith('confirm_order_')) {
+        const orderId = data.replace('confirm_order_', '')
+        const { handleConfirmOrder } = await import('@/lib/orderManagement')
+        await handleConfirmOrder(String(chatId), userId, orderId, callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle reject_order_ callback - admin rejects order
+      if (data.startsWith('reject_order_')) {
+        const orderId = data.replace('reject_order_', '')
+        const { handleRejectOrder } = await import('@/lib/orderManagement')
+        await handleRejectOrder(String(chatId), userId, orderId, callbackQuery.id)
+        return NextResponse.json({ ok: true })
+      }
+
+
       // 推送到单个群组
       if (data.startsWith('publish_') && !data.startsWith('publish_all_')) {
         const parts = data.split('_')
@@ -461,6 +501,44 @@ export async function POST(request: NextRequest) {
       const chatId = message.chat.id
       const text = message.text || ''
       const userId = message.from?.id?.toString()
+      const username = message.from?.username
+      const firstName = message.from?.first_name
+
+      // Check if user is waiting to submit payment proof
+      if (userId) {
+        const { userStates } = await import('@/lib/vipPurchase')
+        const userState = userStates.get(userId)
+        
+        if (userState?.state === 'waiting_payment_proof') {
+          const { handlePaymentProof } = await import('@/lib/vipPurchase')
+          
+          // Get payment proof from text or photo
+          let proof = ''
+          if (text) {
+            proof = text
+          } else if (message.photo && message.photo.length > 0) {
+            // Get the largest photo
+            const photo = message.photo[message.photo.length - 1]
+            proof = `Photo: ${photo.file_id}`
+          }
+          
+          if (proof) {
+            await handlePaymentProof(
+              String(chatId),
+              userId,
+              username,
+              firstName,
+              proof,
+              userState.data.ruleId
+            )
+            userStates.delete(userId)
+          } else {
+            await sendMessage(chatId, '请发送文字或图片作为付款凭证')
+          }
+          
+          return NextResponse.json({ ok: true })
+        }
+      }
 
       // Handle /start command - 简化版本，确保基本功能
       if (text === '/start' || text.startsWith('/start ')) {
@@ -716,79 +794,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // Handle /vip command - VIP membership
-      if (text.startsWith('/vip')) {
+      // Handle /vip command - VIP purchase system
+      if (text === '/vip' || text.startsWith('/vip ')) {
         if (!userId) {
           await sendMessage(chatId, '⛔ 无法识别用户身份')
           return NextResponse.json({ ok: true })
         }
 
-        const { prisma } = await import('@/lib/prisma')
-        const { getSetting } = await import('@/lib/settings')
-        
-        // Get user info
-        const user = await prisma.user.findUnique({
-          where: { telegramId: userId }
-        })
-        
-        const isVip = user?.isVip || false
-        const vipExpireAt = user?.vipExpireAt
-        
-        // Get system settings
-        const limitEnabled = (await getSetting('lottery_limit_enabled')) === 'true'
-        const dailyLimit = parseInt((await getSetting('lottery_daily_limit')) || '3')
-        const dailyJoinCount = user?.dailyJoinCount || 0
-        
-        // Build message
-        let message = '💎 VIP会员中心\n\n'
-        
-        if (isVip) {
-          message += '当前状态：✨ VIP会员\n'
-          if (vipExpireAt) {
-            const expireDate = new Date(vipExpireAt)
-            if (expireDate.getFullYear() === 2099) {
-              message += 'VIP到期：永久\n'
-            } else {
-              message += `VIP到期：${expireDate.toLocaleDateString('zh-CN')}\n`
-            }
-          }
-        } else {
-          message += '当前状态：普通用户\n'
-        }
-        
-        if (limitEnabled && !isVip) {
-          message += `\n今日剩余参与次数：${Math.max(0, dailyLimit - dailyJoinCount)}/${dailyLimit}\n`
-        }
-        
-        message += '\n✨ VIP权益：\n'
-        message += '• 无限创建抽奖\n'
-        message += '• 无限参与抽奖\n'
-        message += '• 推送到群/频道\n'
-        
-        // Get enabled renewal rules for VIP
-        const rules = await prisma.renewalRule.findMany({
-          where: { 
-            isEnabled: true,
-            targetRole: 'vip'
-          },
-          orderBy: { sortOrder: 'asc' }
-        })
-        
-        if (rules.length > 0) {
-          const buttons = rules.map(rule => [{
-            text: `🛒 ${rule.name} ${rule.price} ${rule.currency}`,
-            callback_data: `renewal_rule_${rule.id}`
-          }])
-          
-          await sendMessage(chatId, message, {
-            reply_markup: {
-              inline_keyboard: buttons
-            }
-          })
-        } else {
-          await sendMessage(chatId, message + '\n\n暂无可用的VIP套餐')
-        }
-        
+        const { handleVipCommand } = await import('@/lib/vipPurchase')
+        await handleVipCommand(String(chatId), userId)
         return NextResponse.json({ ok: true })
       }
 
