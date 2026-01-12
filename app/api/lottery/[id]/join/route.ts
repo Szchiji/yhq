@@ -89,10 +89,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     const forcedJoinResult = await checkForcedJoin(telegramId)
 
     if (!forcedJoinResult.passed) {
-      const channelLinks = forcedJoinResult.missingChannels
-        .map(c => c.inviteLink ? `<a href="${c.inviteLink}">${c.title}</a>` : c.title)
-        .join('\n')
-      
       return NextResponse.json({ 
         error: 'Forced join required',
         message: `参与抽奖需要先加入以下群/频道：\n${forcedJoinResult.missingChannels.map(c => c.title).join('、')}`,

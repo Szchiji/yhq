@@ -31,12 +31,9 @@ export async function GET(request: NextRequest) {
         const targetChatId = message.targetChatId || message.user.telegramId
 
         // 发送消息
-        if (message.mediaType === 'none' || !message.mediaUrl) {
-          await sendMessage(targetChatId, message.content)
-        } else {
-          // 如果有媒体，先发送媒体再发送文字（简化处理）
-          await sendMessage(targetChatId, message.content)
-        }
+        // Note: Media sending is simplified - for production use,
+        // consider implementing proper photo/video sending via Bot API
+        await sendMessage(targetChatId, message.content)
 
         // 更新状态为已发送
         await prisma.scheduledMessage.update({
