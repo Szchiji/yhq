@@ -35,7 +35,13 @@ const getSuperAdminMenuItems = (): MenuItem[] => [
     ]
   },
   { name: '管理员管理', href: '/admins' },
-  { name: '系统设置', href: '/settings' },
+  { 
+    name: '系统设置', 
+    children: [
+      { name: '基础设置', href: '/settings' },
+      { name: '过期提醒设置', href: '/settings/reminders' },
+    ]
+  },
 ]
 
 const getAdminMenuItems = (): MenuItem[] => [
