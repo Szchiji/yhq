@@ -533,6 +533,113 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
+      // ── 教师评价平台回调 ──────────────────────────────────────
+
+      // 取消评价操作
+      if (data === 'eval_cancel') {
+        const { clearUserState } = await import('@/lib/teacherEval')
+        await clearUserState(userId)
+        await answerCallbackQuery(callbackQuery.id, '已取消')
+        await sendMessage(chatId, '❌ 操作已取消。')
+        return NextResponse.json({ ok: true })
+      }
+
+      // 截图上传完成
+      if (data === 'eval_screenshots_done') {
+        const { finishScreenshots } = await import('@/lib/teacherEval')
+        await answerCallbackQuery(callbackQuery.id)
+        await finishScreenshots(String(chatId), userId)
+        return NextResponse.json({ ok: true })
+      }
+
+      // 选择预定义标签
+      if (data.startsWith('eval_tag_')) {
+        const tag = data.replace('eval_tag_', '')
+        const { togglePredefinedTag } = await import('@/lib/teacherEval')
+        await answerCallbackQuery(callbackQuery.id)
+        await togglePredefinedTag(String(chatId), userId, tag)
+        return NextResponse.json({ ok: true })
+      }
+
+      // 标签选择完成
+      if (data === 'eval_tags_done') {
+        const { finishTags } = await import('@/lib/teacherEval')
+        await answerCallbackQuery(callbackQuery.id)
+        await finishTags(String(chatId), userId)
+        return NextResponse.json({ ok: true })
+      }
+
+      // 提交报告
+      if (data === 'eval_submit_report') {
+        const { submitReport } = await import('@/lib/teacherEval')
+        await answerCallbackQuery(callbackQuery.id, '提交中...')
+        await submitReport(String(chatId), userId)
+        return NextResponse.json({ ok: true })
+      }
+
+      // 查看教师报告列表
+      if (data.startsWith('eval_view_')) {
+        const teacherUsername = data.replace('eval_view_', '')
+        const { sendTeacherReportList } = await import('@/lib/teacherEval')
+        await answerCallbackQuery(callbackQuery.id)
+        await sendTeacherReportList(String(chatId), teacherUsername)
+        return NextResponse.json({ ok: true })
+      }
+
+      // 查看报告详情
+      if (data.startsWith('eval_report_')) {
+        const reportId = data.replace('eval_report_', '')
+        const { sendReportDetail } = await import('@/lib/teacherEval')
+        await answerCallbackQuery(callbackQuery.id)
+        await sendReportDetail(String(chatId), reportId)
+        return NextResponse.json({ ok: true })
+      }
+
+      // 管理员审核：通过报告
+      if (data.startsWith('eval_approve_')) {
+        const reportId = data.replace('eval_approve_', '')
+        const adminCheck = await isAdmin(userId) || isSuperAdmin(userId)
+        if (!adminCheck) {
+          await answerCallbackQuery(callbackQuery.id, '无权限')
+          return NextResponse.json({ ok: true })
+        }
+        const { approveReport } = await import('@/lib/teacherEval')
+        await answerCallbackQuery(callbackQuery.id, '处理中...')
+        const result = await approveReport(userId, reportId)
+        if (result) {
+          await sendMessage(chatId, `✅ 报告已通过审核并发布。`)
+        } else {
+          await sendMessage(chatId, `⚠️ 报告不存在或已处理。`)
+        }
+        return NextResponse.json({ ok: true })
+      }
+
+      // 管理员审核：驳回报告（进入驳回原因输入状态）
+      if (data.startsWith('eval_reject_')) {
+        const reportId = data.replace('eval_reject_', '')
+        const adminCheck = await isAdmin(userId) || isSuperAdmin(userId)
+        if (!adminCheck) {
+          await answerCallbackQuery(callbackQuery.id, '无权限')
+          return NextResponse.json({ ok: true })
+        }
+        // Set admin's state to waiting for rejection reason
+        const { setUserState } = await import('@/lib/teacherEval')
+        await setUserState(userId, 'admin_reject_reason', { reportId })
+        await answerCallbackQuery(callbackQuery.id)
+        await sendMessage(
+          chatId,
+          `❌ 请输入驳回原因：`,
+          {
+            reply_markup: {
+              inline_keyboard: [[{ text: '❌ 取消', callback_data: 'eval_cancel' }]],
+            },
+          },
+        )
+        return NextResponse.json({ ok: true })
+      }
+
+      // ─────────────────────────────────────────────────────────
+
       await answerCallbackQuery(callbackQuery.id, '处理中...')
 
       return NextResponse.json({ ok: true })
@@ -583,6 +690,109 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // ── 教师评价平台 FSM 状态处理（私聊消息）──────────────────
+      if (userId && message.chat.type === 'private') {
+        const {
+          getUserState,
+          handleQuickReason,
+          handleReportField,
+          handleReportScreenshot,
+          handleTagInput,
+          rejectReport,
+          clearUserState,
+        } = await import('@/lib/teacherEval')
+
+        const evalState = await getUserState(userId)
+
+        if (evalState) {
+          // 管理员驳回原因输入
+          if (evalState.state === 'admin_reject_reason' && text) {
+            const data = evalState.data as any
+            await rejectReport(userId, data.reportId, text)
+            await clearUserState(userId)
+            await sendMessage(chatId, `✅ 已驳回报告。`)
+            return NextResponse.json({ ok: true })
+          }
+
+          // 快速评价理由输入
+          if (evalState.state === 'quick_reason' && text) {
+            const lastName = message.from?.last_name
+            const name = [firstName, lastName].filter(Boolean).join(' ') || username || userId
+            const handled = await handleQuickReason(
+              String(chatId),
+              userId,
+              username,
+              name,
+              text,
+            )
+            if (handled) return NextResponse.json({ ok: true })
+          }
+
+          // 报告表单字段输入
+          if (evalState.state.startsWith('report_field_') && text) {
+            const handled = await handleReportField(String(chatId), userId, text)
+            if (handled) return NextResponse.json({ ok: true })
+          }
+
+          // 报告截图接收
+          if (evalState.state === 'report_screenshots') {
+            if (message.photo && message.photo.length > 0) {
+              const photo = message.photo[message.photo.length - 1]
+              const handled = await handleReportScreenshot(String(chatId), userId, photo.file_id)
+              if (handled) return NextResponse.json({ ok: true })
+            }
+            if (text === '/done') {
+              const { finishScreenshots } = await import('@/lib/teacherEval')
+              await finishScreenshots(String(chatId), userId)
+              return NextResponse.json({ ok: true })
+            }
+          }
+
+          // 标签自由输入
+          if (evalState.state === 'report_tags' && text) {
+            if (text === '/skip') {
+              const { finishTags } = await import('@/lib/teacherEval')
+              await finishTags(String(chatId), userId)
+              return NextResponse.json({ ok: true })
+            }
+            const handled = await handleTagInput(String(chatId), userId, text)
+            if (handled) return NextResponse.json({ ok: true })
+          }
+        }
+      }
+
+      // ── 群组中的 @mention 查询（教师统计卡片）───────────────────
+      if (userId && message.chat.type !== 'private' && message.entities) {
+        const { sendTeacherStatsCard } = await import('@/lib/teacherEval')
+        for (const entity of message.entities) {
+          if (entity.type === 'mention') {
+            const mention = text.substring(entity.offset, entity.offset + entity.length)
+            const teacherUsername = mention.replace(/^@/, '')
+            if (teacherUsername) {
+              await sendTeacherStatsCard(
+                String(chatId),
+                String(chatId),
+                teacherUsername,
+              )
+              return NextResponse.json({ ok: true })
+            }
+          }
+        }
+      }
+
+      // ── 群组中的 #标签 搜索 ─────────────────────────────────────
+      if (userId && message.chat.type !== 'private' && text.includes('#')) {
+        const tagMatches = text.match(/#([^\s#]+)/g)
+        if (tagMatches && tagMatches.length > 0) {
+          const tags = tagMatches.map((t: string) => t.replace(/^#/, ''))
+          const { handleTagSearch } = await import('@/lib/teacherEval')
+          await handleTagSearch(String(chatId), tags)
+          return NextResponse.json({ ok: true })
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+
       // Handle /start command - 简化版本，确保基本功能
       if (text === '/start' || text.startsWith('/start ')) {
         try {
@@ -612,6 +822,49 @@ export async function POST(request: NextRequest) {
           
           const startParam = text.split(' ')[1]
           
+          // ── 教师评价 start 参数: eval_username_groupId_action ──
+          if (startParam?.startsWith('eval_')) {
+            // Format: eval_{teacherUsername}_{groupId}_{action}
+            // action = like / dislike / report
+            try {
+              const parts = startParam.split('_')
+              // parts[0] = 'eval', parts[1] = teacherUsername, parts[2] = groupId, parts[3] = action
+              if (parts.length < 4) {
+                await sendMessage(chatId, '⚠️ 无效的评价链接。')
+                return NextResponse.json({ ok: true })
+              }
+              const teacherUsername = parts[1]
+              const groupId = parts[2]
+              const action = parts[3] // like / dislike / report
+
+              // Check forced subscription
+              const { checkSubscription, sendSubscriptionPrompt } = await import('@/lib/teacherEval')
+              const subCheck = await checkSubscription(userId || '')
+              if (!subCheck.ok) {
+                await sendSubscriptionPrompt(String(chatId), subCheck.missing)
+                return NextResponse.json({ ok: true })
+              }
+
+              if (action === 'like' || action === 'dislike') {
+                const { startQuickRate } = await import('@/lib/teacherEval')
+                await startQuickRate(
+                  String(chatId),
+                  userId || '',
+                  teacherUsername,
+                  groupId,
+                  action === 'like',
+                )
+              } else if (action === 'report') {
+                const { startReportForm } = await import('@/lib/teacherEval')
+                await startReportForm(String(chatId), userId || '', teacherUsername, groupId)
+              }
+            } catch (error) {
+              console.error('Error handling eval start param:', error)
+              await sendMessage(chatId, '⚠️ 处理失败，请稍后重试')
+            }
+            return NextResponse.json({ ok: true })
+          }
+
           if (startParam?.startsWith('lottery_')) {
             // 参与抽奖逻辑
             const lotteryId = startParam.replace('lottery_', '')

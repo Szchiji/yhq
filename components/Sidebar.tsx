@@ -34,6 +34,16 @@ const getSuperAdminMenuItems = (): MenuItem[] => [
     ]
   },
   { name: '管理员管理', href: '/admins' },
+  {
+    name: '教师评价平台',
+    children: [
+      { name: '快速评价管理', href: '/evaluations' },
+      { name: '报告审核', href: '/reports' },
+      { name: '标签管理', href: '/eval-tags' },
+      { name: '评价频道', href: '/eval-channels' },
+      { name: '报告模板', href: '/eval-template' },
+    ],
+  },
   { 
     name: '系统设置', 
     children: [
@@ -55,6 +65,16 @@ const getAdminMenuItems = (): MenuItem[] => [
   { name: '定时发送', href: '/scheduled' },
   { name: '私聊命令管理', href: '/commands' },
   { name: '订单管理', href: '/orders' },
+  {
+    name: '教师评价平台',
+    children: [
+      { name: '快速评价管理', href: '/evaluations' },
+      { name: '报告审核', href: '/reports' },
+      { name: '标签管理', href: '/eval-tags' },
+      { name: '评价频道', href: '/eval-channels' },
+      { name: '报告模板', href: '/eval-template' },
+    ],
+  },
 ]
 
 type SidebarProps = {

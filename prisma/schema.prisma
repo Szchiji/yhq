@@ -391,3 +391,124 @@ model ReminderLog {
   
   @@unique([telegramId, type, daysLeft])
 }
+
+// ============================================================
+// 教师评价平台
+// ============================================================
+
+// 快速评价记录（系统A）
+model QuickEvaluation {
+  id               String   @id @default(cuid())
+  teacherUsername  String   // 被评价教师的用户名（不含@）
+  raterId          String   // 评价人 Telegram ID
+  raterUsername    String?
+  raterName        String?
+  isPositive       Boolean  // true=👍推荐, false=👎不推荐
+  reason           String   // 理由（≥12字）
+  groupId          String?  // 来源群组 ID
+  createdAt        DateTime @default(now())
+
+  @@index([teacherUsername])
+  @@index([raterId])
+}
+
+// 待审核的详细报告（系统B）
+model PendingReport {
+  id               String   @id @default(cuid())
+  teacherUsername  String   // 被报告教师的用户名（不含@）
+  authorId         String   // 提交人 Telegram ID
+  authorUsername   String?
+  authorName       String?
+  groupId          String?
+  formData         Json     // 表单字段数据 {key: value}
+  tags             String[] // 标签数组
+  status           String   @default("pending") // pending / approved / rejected
+  rejectionReason  String?
+  reviewedBy       String?  // 审核人 Telegram ID
+  reviewedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  screenshots      ReportScreenshot[]
+
+  @@index([teacherUsername])
+  @@index([status])
+}
+
+// 已发布的详细报告
+model PublishedReport {
+  id               String   @id @default(cuid())
+  teacherUsername  String
+  authorId         String
+  authorUsername   String?
+  authorName       String?
+  formData         Json
+  tags             String[]
+  channelMessageIds Json?   // {channelId: messageId} 推送到各频道的消息ID
+  pendingReportId  String?  // 来源待审核报告ID
+  createdAt        DateTime @default(now())
+
+  @@index([teacherUsername])
+  @@index([tags])
+}
+
+// 预约截图（关联待审核报告）
+model ReportScreenshot {
+  id        String        @id @default(cuid())
+  reportId  String
+  report    PendingReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  fileId    String        // Telegram file_id
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+}
+
+// 标签字段配置
+model TagFieldConfig {
+  id         String   @id @default(cuid())
+  isEnabled  Boolean  @default(true)
+  isRequired Boolean  @default(false)
+  mode       String   @default("predefined") // predefined / free
+  maxTags    Int      @default(5)
+  fieldLabel String   @default("标签")
+  updatedAt  DateTime @updatedAt
+}
+
+// 预定义标签
+model PredefinedTag {
+  id        String   @id @default(cuid())
+  tag       String   @unique
+  sortOrder Int      @default(0)
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// 评价平台频道配置
+model EvalChannel {
+  id        String   @id @default(cuid())
+  chatId    String   @unique
+  title     String
+  type      String   @default("report") // report（报告推送频道）/ subscribe（强制订阅频道）
+  username  String?
+  inviteLink String?
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 报告表单模板
+model ReportTemplate {
+  id        String   @id @default(cuid())
+  fields    Json     // [{key, label, order, required, type}]
+  header    String   @default("")
+  footer    String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+// 用户评价操作状态（FSM）
+model UserEvalState {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  state     String   // quick_reason / report_field_N / report_screenshots / report_tags / report_preview
+  data      Json?    // 已收集的数据 {teacherUsername, groupId, fieldIndex, formData, tags, screenshots}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
