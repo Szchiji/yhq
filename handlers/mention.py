@@ -1,7 +1,7 @@
 import logging
 from aiogram import Router
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from config import ADMIN_IDS
+from config import config
 from database import (
     get_quick_evaluation_stats,
     get_user_rating,
@@ -16,7 +16,7 @@ router = Router()
 
 def is_admin(user_id: int) -> bool:
     """检查是否是管理员"""
-    return user_id in ADMIN_IDS
+    return user_id in config.ADMIN_IDS
 
 
 @router.message()
