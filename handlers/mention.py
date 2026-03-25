@@ -1,308 +1,199 @@
-import asyncio
 import logging
-import os
-from dotenv import load_dotenv
-from aiogram import Dispatcher, Bot
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiohttp import web
-
-# 加载环境变量
-load_dotenv()
-
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+from aiogram import Router
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from config import ADMIN_IDS
+from database import (
+    get_quick_evaluation_stats,
+    get_user_rating,
+    save_quick_evaluation
 )
+
 logger = logging.getLogger(__name__)
 
-# 获取配置
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split(","))) if os.getenv("ADMIN_IDS") else []
-MODE = os.getenv("BOT_MODE", "polling")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "0.0.0.0")
-WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8000"))
-WEBHOOK_PATH = "/webhook"
-
-# 验证必填配置
-if not BOT_TOKEN:
-    logger.error("❌ BOT_TOKEN 环境变量未设置！")
-    exit(1)
-
-if not ADMIN_IDS:
-    logger.warning("⚠️ ADMIN_IDS 环境变量未设置或为空")
-
-# 初始化机器人和调度器
-bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+# ✅ 定义 router 对象（这是关键！）
+router = Router()
 
 
-async def startup():
-    """启动前的准备工作"""
+def is_admin(user_id: int) -> bool:
+    """检查是否是管理员"""
+    return user_id in ADMIN_IDS
+
+
+@router.message()
+async def mention_handler(message: Message):
+    """
+    处理提及用户名的消息
+    格式：@username 或 #标签
+    """
+    if not message.text:
+        return
+    
+    text = message.text.strip()
+    
+    # ════════════════════════════════════════════════════
+    # 处理标签搜索 (#标签)
+    # ════════════════════════════════════════════════════
+    
+    if text.startswith("#"):
+        # 标签搜索逻辑
+        try:
+            from handlers.search import handle_tag_search
+            await handle_tag_search(message)
+        except Exception as e:
+            logger.warning(f"标签搜索处理失败：{e}")
+        return
+    
+    # ════════════════════════════════════════════════════
+    # 处理用户查询 (@username)
+    # ════════════════════════════════════════════════════
+    
+    # 提取 @username
+    if not text.startswith("@"):
+        return
+    
+    # 移除 @ 符号
+    username = text[1:].split()[0]  # 只取第一个单词
+    
+    if not username or len(username) < 2:
+        return
+    
     try:
-        # 获取机器人信息
-        bot_info = await bot.get_me()
-        logger.info(f"✅ 机器人已启动：@{bot_info.username} ({bot_info.first_name})")
+        # 获取统计数据
+        stats = get_quick_evaluation_stats(username)
         
-        # 显示管理员列表
-        if ADMIN_IDS:
-            logger.info(f"✅ 管理员列表：{ADMIN_IDS}")
+        # 建立统计卡片
+        recommend_count = stats.get("recommend_count", 0)
+        not_recommend_count = stats.get("not_recommend_count", 0)
+        avg_score = stats.get("avg_score", 0)
         
-        # 尝试通知管理员机器人已启动
-        if ADMIN_IDS:
-            for admin_id in ADMIN_IDS:
-                try:
-                    await bot.send_message(
-                        admin_id,
-                        "✅ 机器人已启动！\n\n"
-                        f"机器人：@{bot_info.username}\n"
-                        f"ID：{bot_info.id}\n"
-                        f"模式：{MODE.upper()}\n"
-                        f"时间：{__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                    )
-                except Exception as e:
-                    logger.warning(f"⚠️ 无法通知管理员 {admin_id}：{e}")
-        
-        return True
-    except Exception as e:
-        logger.error(f"❌ 启动失败：{e}")
-        return False
-
-
-async def shutdown():
-    """关闭时的清理工作"""
-    logger.info("🛑 正在关闭机器人...")
-    await bot.session.close()
-    logger.info("✅ 机器人已关闭")
-
-
-def register_handlers():
-    """注册所有处理器"""
-    try:
-        # 导入所有处理器模块
-        from handlers import (
-            mention,      # 统计卡片查询
-            report_form,  # 报告表单处理
-            quick_rate,   # 快速评价
-            admin,        # 管理员菜单
-            template,     # 模板管理
-            search,       # 标签搜索
-            menu          # 主菜单
+        # 使用纯文本格式（不用 Markdown）
+        card_text = (
+            f"👤 @{username}\n"
+            f"\n"
+            f"📊 评价统计：\n"
+            f"  👍 {recommend_count} 人\n"
+            f"  👎 {not_recommend_count} 人\n"
+            f"  ⭐ 平均评分：{avg_score:.2f}/10\n"
+            f"\n"
+            f"选择操作："
         )
         
-        # 注册路由
-        dp.include_router(mention.router)
-        dp.include_router(report_form.router)
-        dp.include_router(quick_rate.router)
-        dp.include_router(admin.router)
-        dp.include_router(template.router)
-        dp.include_router(search.router)
-        dp.include_router(menu.router)
+        # 建立按钮
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="👍 推荐",
+                    callback_data=f"quick_recommend|{username}"
+                ),
+                InlineKeyboardButton(
+                    text="👎 不推荐",
+                    callback_data=f"quick_not_recommend|{username}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📝 写报告",
+                    callback_data=f"report_start|{username}"
+                ),
+                InlineKeyboardButton(
+                    text="❌ 取消",
+                    callback_data="close_card"
+                )
+            ]
+        ])
         
-        logger.info("✅ 所有处理器已注册")
-        return True
-    except ImportError as e:
-        logger.error(f"❌ 处理器导入失败：{e}")
-        return False
-
-
-async def init_database():
-    """初始化数据库"""
-    try:
-        logger.info("正在初始化数据库...")
-        from database import init_db
-        # ✅ 修复：添加 await
-        await init_db()
-        logger.info("✅ 数据库初始化完成")
-        return True
-    except Exception as e:
-        logger.error(f"❌ 数据库初始化失败：{e}")
-        return False
-
-
-# ════════════════════════════════════════════════════
-# Polling 模式
-# ════════════════════════════════════════════════════
-
-async def polling_mode():
-    """Polling 模式（轮询）"""
-    logger.info("=" * 50)
-    logger.info("📡 启动 Polling 模式（轮询）")
-    logger.info("=" * 50)
-    
-    try:
-        # 删除任何存在的 webhook
-        try:
-            await bot.delete_webhook(drop_pending_updates=False)
-            logger.info("✅ Webhook 已删除")
-        except Exception as e:
-            logger.warning(f"⚠️ Webhook 删除提示：{e}")
-        
-        # 启动前的准备
-        if not await startup():
-            return False
-        
-        logger.info("🚀 开始轮询消息...")
-        logger.info(f"📍 Polling 模式已激活")
-        
-        try:
-            await dp.start_polling(
-                bot,
-                allowed_updates=dp.resolve_used_update_types(),
-                skip_updates=False
-            )
-        except Exception as e:
-            logger.error(f"❌ Polling 失败：{e}")
-            raise
-    
-    except Exception as e:
-        logger.error(f"❌ Polling 模式出错：{e}", exc_info=True)
-        return False
-    finally:
-        await shutdown()
-
-
-# ════════════════════════════════════════════════════
-# Webhook 模式
-# ════════════════════════════════════════════════════
-
-async def webhook_mode():
-    """Webhook 模式"""
-    logger.info("=" * 50)
-    logger.info("🔗 启动 Webhook 模式")
-    logger.info("=" * 50)
-    
-    if not WEBHOOK_URL:
-        logger.error("❌ Webhook 模式需要设置 WEBHOOK_URL 环境变量！")
-        logger.error("例如：WEBHOOK_URL=https://yourdomain.com")
-        exit(1)
-    
-    try:
-        # 启动前的准备
-        if not await startup():
-            return False
-        
-        # 设置 Webhook
-        webhook_info = await bot.set_webhook(
-            url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
-            drop_pending_updates=False
+        # 发送卡片（纯文本，不使用 parse_mode）
+        await message.reply(
+            card_text,
+            reply_markup=kb
         )
-        logger.info(f"✅ Webhook 已设置：{WEBHOOK_URL}{WEBHOOK_PATH}")
-        logger.info(f"📍 Webhook 信息：{webhook_info}")
         
-        # 创建 aiohttp Web 应用
-        app = web.Application()
+        logger.info(f"显示用户 @{username} 的统计卡片")
         
-        # Webhook 处理器
-        async def webhook_handler(request: web.Request) -> web.Response:
-            """处理 Webhook 请求"""
-            try:
-                update_data = await request.json()
-                await dp.feed_update(bot, update_data)
-                return web.Response(text="ok")
-            except Exception as e:
-                logger.error(f"❌ Webhook 处理失败：{e}", exc_info=True)
-                return web.Response(text="error", status=400)
-        
-        # 健康检查处理器
-        async def health_handler(request: web.Request) -> web.Response:
-            """健康检查端点"""
-            return web.Response(text="healthy")
-        
-        # 添加路由
-        app.router.add_post(WEBHOOK_PATH, webhook_handler)
-        app.router.add_get("/health", health_handler)
-        
-        logger.info(f"🚀 Webhook 服务器启动：{WEBHOOK_HOST}:{WEBHOOK_PORT}")
-        logger.info(f"📍 Webhook 路径：{WEBHOOK_PATH}")
-        logger.info(f"📍 健康检查：http://{WEBHOOK_HOST}:{WEBHOOK_PORT}/health")
-        
-        # 启动 Web 服务器
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, WEBHOOK_HOST, WEBHOOK_PORT)
-        await site.start()
-        
-        logger.info("✅ Webhook 模式已启动，等待来自 Telegram 的消息...")
-        
-        # 保持运行
-        while True:
-            await asyncio.sleep(3600)
-    
     except Exception as e:
-        logger.error(f"❌ Webhook 模式出错：{e}", exc_info=True)
-        return False
-    finally:
-        await shutdown()
+        logger.error(f"处理用户查询失败：{e}", exc_info=True)
+        await message.reply(
+            f"❌ 查询失败：{str(e)}\n\n"
+            f"请稍后重试或联系管理员。"
+        )
 
 
-# ════════════════════════════════════════════════════
-# 混合模式
-# ════════════════════════════════════════════════════
-
-async def hybrid_mode():
-    """混合模式：根据环境自动选择"""
-    logger.info("=" * 50)
-    logger.info("🔄 启动混合模式（自动选择）")
-    logger.info("=" * 50)
-    
-    # 如果有 WEBHOOK_URL，使用 Webhook；否则使用 Polling
-    if WEBHOOK_URL:
-        logger.info("🔗 检测到 WEBHOOK_URL，使用 Webhook 模式")
-        await webhook_mode()
-    else:
-        logger.info("📡 未检测到 WEBHOOK_URL，使用 Polling 模式")
-        await polling_mode()
-
-
-# ════════════════════════════════════════════════════
-# 主函数
-# ════════════════════════════════════════════════════
-
-async def main():
-    """主函数"""
+@router.callback_query(lambda c: c.data.startswith("quick_recommend|"))
+async def handle_quick_recommend(callback, state):
+    """快速推荐"""
     try:
-        # Step 1：初始化数据库（✅ 修复：添加 await）
-        if not await init_database():
-            logger.error("❌ 数据库初始化失败，退出")
-            return False
+        username = callback.data.split("|")[1]
         
-        # Step 2：注册处理器
-        if not register_handlers():
-            logger.error("❌ 处理器注册失败，退出")
-            return False
+        await callback.message.edit_text(
+            f"请输入对 @{username} 的推荐理由\n\n"
+            f"（至少 12 个字符）"
+        )
         
-        # Step 3：根据模式启动
-        logger.info(f"📌 当前模式：{MODE.upper()}")
+        # 保存用户名到状态
+        await state.update_data(
+            quick_eval_username=username,
+            quick_eval_recommend=True
+        )
         
-        if MODE.lower() == "webhook":
-            await webhook_mode()
-        elif MODE.lower() == "polling":
-            await polling_mode()
-        elif MODE.lower() == "hybrid":
-            await hybrid_mode()
-        else:
-            logger.error(f"❌ 未知的模式：{MODE}")
-            logger.error("✅ 可用模式：polling, webhook, hybrid")
-            return False
+        await callback.answer()
         
     except Exception as e:
-        logger.error(f"❌ 致命错误：{e}", exc_info=True)
-        return False
+        logger.error(f"快速推荐处理失败：{e}")
+        await callback.answer("❌ 处理失败", show_alert=True)
 
 
-if __name__ == "__main__":
+@router.callback_query(lambda c: c.data.startswith("quick_not_recommend|"))
+async def handle_quick_not_recommend(callback, state):
+    """快速不推荐"""
     try:
-        logger.info("=" * 50)
-        logger.info("🤖 狼评机器人启动中...")
-        logger.info("=" * 50)
+        username = callback.data.split("|")[1]
         
-        asyncio.run(main())
+        await callback.message.edit_text(
+            f"请输入对 @{username} 的不推荐理由\n\n"
+            f"（至少 12 个字符）"
+        )
         
-    except KeyboardInterrupt:
-        logger.info("\n⚠️ 收到中止信���，正在关闭...")
+        # 保存用户名到状态
+        await state.update_data(
+            quick_eval_username=username,
+            quick_eval_recommend=False
+        )
+        
+        await callback.answer()
+        
     except Exception as e:
-        logger.error(f"❌ 未捕获的异常：{e}", exc_info=True)
-        exit(1)
+        logger.error(f"快速不推荐处理失败：{e}")
+        await callback.answer("❌ 处理失败", show_alert=True)
+
+
+@router.callback_query(lambda c: c.data == "close_card")
+async def handle_close_card(callback):
+    """关闭卡片"""
+    try:
+        await callback.message.delete()
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"关闭卡片失败：{e}")
+
+
+@router.callback_query(lambda c: c.data.startswith("report_start|"))
+async def handle_report_start(callback, state):
+    """开始写报告"""
+    try:
+        username = callback.data.split("|")[1]
+        
+        await callback.answer()
+        await callback.message.delete()
+        
+        # 开始报告流程
+        await callback.message.answer(
+            f"📝 开始为 @{username} 写报告\n\n"
+            f"第一步：您对 @{username} 的态度是？"
+        )
+        
+        # 保存用户名到状态
+        await state.update_data(report_target_username=username)
+        
+    except Exception as e:
+        logger.error(f"开始写报告失败：{e}")
+        await callback.answer("❌ 处理失败", show_alert=True)
