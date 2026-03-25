@@ -413,6 +413,40 @@ async def save_quick_evaluation(
     return cursor.lastrowid
 
 
+async def get_quick_evaluation_stats(teacher_username: str) -> dict:
+    """获取教师快速评价统计（含推荐数、不推荐数和平均评分）"""
+    db = await get_db()
+
+    cursor = await db.execute(
+        """SELECT
+               COUNT(*) as total,
+               SUM(CASE WHEN is_recommended = 1 THEN 1 ELSE 0 END) as recommended,
+               SUM(CASE WHEN is_recommended = 0 THEN 1 ELSE 0 END) as not_recommended
+           FROM quick_evaluations
+           WHERE teacher_username = ?""",
+        (teacher_username,),
+    )
+    row = await cursor.fetchone()
+
+    total = row["total"] or 0
+    recommended = row["recommended"] or 0
+    not_recommended = row["not_recommended"] or 0
+    avg_score = ((recommended / total) * 10) if total > 0 else 0.0
+
+    return {
+        "recommend_count": recommended,
+        "not_recommend_count": not_recommended,
+        "avg_score": avg_score,
+        "total": total,
+    }
+
+
+async def get_user_rating(teacher_username: str) -> float:
+    """获取教师的平均评分（0-10）"""
+    stats = await get_quick_evaluation_stats(teacher_username)
+    return stats["avg_score"]
+
+
 async def get_teacher_stats(teacher_username: str) -> dict:
     """获取教师评价统计"""
     db = await get_db()

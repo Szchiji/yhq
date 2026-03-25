@@ -59,7 +59,7 @@ async def mention_handler(message: Message):
     
     try:
         # 获取统计数据
-        stats = get_quick_evaluation_stats(username)
+        stats = await get_quick_evaluation_stats(username)
         
         # 建立统计卡片
         recommend_count = stats.get("recommend_count", 0)
