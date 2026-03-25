@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # 获取配置
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split(","))) if os.getenv("ADMIN_IDS") else []
-MODE = os.getenv("BOT_MODE", "polling")  # polling 或 webhook
+MODE = os.getenv("BOT_MODE", "polling")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "0.0.0.0")
 WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8000"))
@@ -108,12 +108,13 @@ def register_handlers():
         return False
 
 
-def init_database():
+async def init_database():
     """初始化数据库"""
     try:
         logger.info("正在初始化数据库...")
         from database import init_db
-        init_db()
+        # ✅ 修复：添加 await
+        await init_db()
         logger.info("✅ 数据库初始化完成")
         return True
     except Exception as e:
@@ -174,7 +175,7 @@ async def webhook_mode():
     logger.info("=" * 50)
     
     if not WEBHOOK_URL:
-        logger.error("❌ Webhook 模式需要设置 WEBHOOK_URL 环境变��！")
+        logger.error("❌ Webhook 模式需要设置 WEBHOOK_URL 环境变量！")
         logger.error("例如：WEBHOOK_URL=https://yourdomain.com")
         exit(1)
     
@@ -199,7 +200,6 @@ async def webhook_mode():
             """处理 Webhook 请求"""
             try:
                 update_data = await request.json()
-                update = dp.feed_update(bot, update_data)
                 await dp.feed_update(bot, update_data)
                 return web.Response(text="ok")
             except Exception as e:
@@ -239,7 +239,7 @@ async def webhook_mode():
 
 
 # ════════════════════════════════════════════════════
-# 双模式（Polling + Webhook）
+# 混合模式
 # ════════════════════════════════════════════════════
 
 async def hybrid_mode():
@@ -257,15 +257,15 @@ async def hybrid_mode():
         await polling_mode()
 
 
-# ════��═══════════════════════════════════════════════
+# ════════════════════════════════════════════════════
 # 主函数
 # ════════════════════════════════════════════════════
 
 async def main():
     """主函数"""
     try:
-        # Step 1：初始化数据库
-        if not init_database():
+        # Step 1：初始化数据库（✅ 修复：添加 await）
+        if not await init_database():
             logger.error("❌ 数据库初始化失败，退出")
             return False
         
@@ -302,7 +302,7 @@ if __name__ == "__main__":
         asyncio.run(main())
         
     except KeyboardInterrupt:
-        logger.info("\n⚠️ 收到中止信号，正在关闭...")
+        logger.info("\n⚠️ 收到中止信���，正在关闭...")
     except Exception as e:
         logger.error(f"❌ 未捕获的异常：{e}", exc_info=True)
         exit(1)
