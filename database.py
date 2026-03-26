@@ -1242,3 +1242,30 @@ async def save_start_settings(welcome_text: str = None, photo_file_id: str = Non
         await set_bot_setting("start_welcome_text", welcome_text)
     if photo_file_id is not None:
         await set_bot_setting("start_photo_file_id", photo_file_id)
+
+
+async def get_menu_keyboard_settings() -> dict:
+    """获取底部菜单键盘设置"""
+    keys = [
+        "menu_keyboard_enabled",
+        "menu_btn_main",
+        "menu_btn_help",
+    ]
+    result = {}
+    for key in keys:
+        result[key] = await get_bot_setting(key)
+    return result
+
+
+async def save_menu_keyboard_settings(
+    enabled: bool = None,
+    btn_main: str = None,
+    btn_help: str = None,
+):
+    """保存底部菜单键盘设置"""
+    if enabled is not None:
+        await set_bot_setting("menu_keyboard_enabled", "1" if enabled else "0")
+    if btn_main is not None:
+        await set_bot_setting("menu_btn_main", btn_main)
+    if btn_help is not None:
+        await set_bot_setting("menu_btn_help", btn_help)

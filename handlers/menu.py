@@ -4,12 +4,16 @@
 import logging
 
 from aiogram import Router, F
-from aiogram.filters import CommandStart
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.filters import CommandStart, StateFilter
+from aiogram.types import (
+    Message, CallbackQuery,
+    InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardMarkup, KeyboardButton,
+)
 from aiogram.fsm.context import FSMContext
 
 from config import config
-from database import is_blacklisted, get_required_channels, get_total_stats, upsert_user, get_start_settings
+from database import is_blacklisted, get_required_channels, get_total_stats, upsert_user, get_start_settings, get_menu_keyboard_settings
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -127,21 +131,28 @@ async def show_main_menu(message: Message):
         photo_file_id = ""
 
     text = custom_text if custom_text else _build_menu_text()
-    kb = _build_menu_keyboard(user_id)
+    inline_kb = _build_menu_keyboard(user_id)
+    reply_kb = await _build_reply_keyboard()
 
     if photo_file_id:
         try:
             await message.answer_photo(
                 photo=photo_file_id,
                 caption=text,
-                reply_markup=kb,
+                reply_markup=inline_kb,
                 parse_mode="Markdown",
             )
+            # Set the reply keyboard with a separate activation message
+            if reply_kb:
+                await message.answer("⌨️ 底部快捷菜单已就绪", reply_markup=reply_kb)
             return
         except Exception as e:
             logger.warning(f"发送欢迎图片失败：{e}")
 
-    await message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    await message.answer(text, reply_markup=inline_kb, parse_mode="Markdown")
+    # Set the reply keyboard with a separate activation message
+    if reply_kb:
+        await message.answer("⌨️ 底部快捷菜单已就绪", reply_markup=reply_kb)
 
 
 def _build_menu_text() -> str:
@@ -169,6 +180,28 @@ def _build_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="❓ 使用帮助", callback_data="help")
     ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+async def _build_reply_keyboard() -> ReplyKeyboardMarkup | None:
+    """构建底部快捷菜单键盘（从数据库读取设置）"""
+    try:
+        settings = await get_menu_keyboard_settings()
+        # 默认启用（首次使用时 setting 值为 None，视为启用）
+        enabled_val = settings.get("menu_keyboard_enabled")
+        if enabled_val == "0":
+            return None
+        btn_main = settings.get("menu_btn_main") or "🏠 主菜单"
+        btn_help = settings.get("menu_btn_help") or "❓ 帮助"
+        return ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text=btn_main), KeyboardButton(text=btn_help)],
+            ],
+            resize_keyboard=True,
+            is_persistent=True,
+        )
+    except Exception as e:
+        logger.warning(f"构建底部菜单键盘失败：{e}")
+        return None
 
 
 @router.callback_query(F.data == "help")
@@ -200,3 +233,66 @@ async def help_callback(callback: CallbackQuery):
     ]])
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
+
+
+# ============================================================
+# 底部快捷菜单键盘按钮处理器
+# ============================================================
+
+async def _get_reply_button_texts() -> tuple[str, str]:
+    """获取底部菜单按钮文本"""
+    try:
+        settings = await get_menu_keyboard_settings()
+        btn_main = settings.get("menu_btn_main") or "🏠 主菜单"
+        btn_help = settings.get("menu_btn_help") or "❓ 帮助"
+        return btn_main, btn_help
+    except Exception:
+        return "🏠 主菜单", "❓ 帮助"
+
+
+@router.message(
+    StateFilter(None),
+    F.chat.type == "private",
+    F.text,
+    ~F.text.startswith("@"),
+    ~F.text.regexp(r"#\w+"),
+)
+async def reply_keyboard_handler(message: Message, state: FSMContext):
+    """处理底部快捷菜单按钮文本消息（仅在无活动状态的私聊中生效）"""
+    text = message.text or ""
+    btn_main, btn_help = await _get_reply_button_texts()
+
+    if text == btn_main:
+        await state.clear()
+        user_id = message.from_user.id
+        await message.answer(
+            _build_menu_text(),
+            reply_markup=_build_menu_keyboard(user_id),
+            parse_mode="Markdown",
+        )
+    elif text == btn_help:
+        help_text = (
+            "📖 **使用帮助**\n\n"
+            "**1️⃣ 查询教师评价**\n"
+            "在群组中输入 `@用户名`（如 `@teacher123`）\n"
+            "机器人会显示该教师的评价统计卡片\n\n"
+            "**2️⃣ 快速评价**\n"
+            "点击【👍推荐】或【👎不推荐】\n"
+            "输入一句话理由（至少 12 个字）\n\n"
+            "**3️⃣ 提交详细报告**\n"
+            "点击【📝写报告】\n"
+            "按步骤填写报告表单\n"
+            "上传预约截图（1-3 张，必填）\n"
+            "等待管理员审核通过后发布\n\n"
+            "**4️⃣ 标签搜索**\n"
+            "在群组中输入 `#标签名` 即可搜索\n"
+            "支持多标签：`#龙岗 #竹竹`\n\n"
+            "**5️⃣ 注意事项**\n"
+            "• 每人每位教师只能进行一次快速评价\n"
+            "• 报告需要管理员审核后才会公开\n"
+            "• 请遵守平台规则，不得恶意评价"
+        )
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🔙 返回主菜单", callback_data="main_menu")
+        ]])
+        await message.answer(help_text, reply_markup=kb, parse_mode="Markdown")

@@ -1,6 +1,7 @@
 """
 管理员菜单和审核处理模块
 """
+import html as html_module
 import logging
 
 from aiogram import Router, F
@@ -225,11 +226,11 @@ async def review_report(callback: CallbackQuery):
     created_at = report.get("created_at", "")
 
     text = (
-        f"📋 **报告 #{report_id}**\n"
+        f"📋 <b>报告 #{report_id}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 教师：@{teacher}\n"
-        f"📤 提交人：{submitter}\n"
-        f"📅 提交时间：{created_at[:16] if created_at else '未知'}\n\n"
+        f"👤 教师：@{html_module.escape(teacher)}\n"
+        f"📤 提交人：{html_module.escape(submitter)}\n"
+        f"📅 提交时间：{html_module.escape(created_at[:16] if created_at else '未知')}\n\n"
     )
 
     from database import get_template_fields
@@ -238,10 +239,10 @@ async def review_report(callback: CallbackQuery):
         key = field["field_key"]
         label = field["field_label"]
         value = form_data.get(key, "（未填写）")
-        text += f"**{label}：**{value}\n"
+        text += f"<b>{html_module.escape(label)}：</b>{html_module.escape(str(value))}\n"
 
     if tags:
-        text += f"\n🏷 标签：{' '.join('#'+t for t in tags)}"
+        text += f"\n🏷 标签：{' '.join('#'+html_module.escape(t) for t in tags)}"
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -255,7 +256,7 @@ async def review_report(callback: CallbackQuery):
             InlineKeyboardButton(text="🔙 返回审核列表", callback_data="admin:review_menu"),
         ],
     ])
-    await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     await callback.answer()
 
 

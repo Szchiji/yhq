@@ -429,3 +429,22 @@ async def submit_report(callback: CallbackQuery, state: FSMContext):
     )
     await callback.answer("✅ 已提交")
     logger.info(f"用户 {user_id} 提交了关于 @{teacher_username} 的报告 #{report_id}")
+
+    # 通知所有管理员
+    notify_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🔍 查看报告", callback_data=f"admin:review:{report_id}")
+    ]])
+    for admin_id in config.ADMIN_IDS:
+        try:
+            await callback.bot.send_message(
+                admin_id,
+                f"📋 <b>新报告待审核！</b>\n\n"
+                f"报告 ID：#{report_id}\n"
+                f"教师：@{html.escape(teacher_username)}\n"
+                f"提交人：{html.escape(user_name)}\n\n"
+                f"请点击下方按钮审核报告。",
+                parse_mode="HTML",
+                reply_markup=notify_kb,
+            )
+        except Exception as e:
+            logger.warning(f"无法通知管理员 {admin_id}: {e}")
