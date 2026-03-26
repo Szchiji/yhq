@@ -3,6 +3,7 @@
 管理员可以自定义字段、标签、头部/尾部
 """
 import logging
+import re
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -25,6 +26,11 @@ from states import TemplateStates
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+
+def _escape_md(text: str) -> str:
+    """Escape special characters for Telegram MarkdownV1 (\\, _, *, [, `)."""
+    return re.sub(r'[\\\_\*\[\`]', lambda m: '\\' + m.group(), text)
 
 
 # ============================================================
@@ -94,7 +100,7 @@ async def edit_single_field(callback: CallbackQuery, state: FSMContext):
         InlineKeyboardButton(text="❌ 取消", callback_data="template:cancel_edit")
     ]])
     await callback.message.answer(
-        f"✏️ 请输入字段 **{field_key}** 的新显示名称：",
+        f"✏️ 请输入字段 **{_escape_md(field_key)}** 的新显示名称：",
         reply_markup=kb,
         parse_mode="Markdown",
     )
@@ -114,7 +120,7 @@ async def receive_field_label(message: Message, state: FSMContext):
 
     await update_template_field_label(field_key, new_label)
     await state.clear()
-    await message.answer(f"✅ 字段 **{field_key}** 的显示名称已更新为：**{new_label}**", parse_mode="Markdown")
+    await message.answer(f"✅ 字段 **{_escape_md(field_key)}** 的显示名称已更新为：**{_escape_md(new_label)}**", parse_mode="Markdown")
 
 
 # ============================================================
@@ -225,9 +231,9 @@ async def receive_new_tag(message: Message, state: FSMContext):
     await state.clear()
 
     if success:
-        await message.answer(f"✅ 标签 **#{tag}** 已添加", parse_mode="Markdown")
+        await message.answer(f"✅ 标签 **#{_escape_md(tag)}** 已添加", parse_mode="Markdown")
     else:
-        await message.answer(f"⚠️ 标签 **#{tag}** 已存在", parse_mode="Markdown")
+        await message.answer(f"⚠️ 标签 **#{_escape_md(tag)}** 已存在", parse_mode="Markdown")
 
 
 @router.callback_query(F.data.startswith("template:del_tag:"))
