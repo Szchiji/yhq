@@ -1249,7 +1249,13 @@ async def get_menu_keyboard_settings() -> dict:
     keys = [
         "menu_keyboard_enabled",
         "menu_btn_main",
+        "menu_btn_main_action",
         "menu_btn_help",
+        "menu_btn_help_action",
+        "menu_btn_3",
+        "menu_btn_3_action",
+        "menu_btn_4",
+        "menu_btn_4_action",
     ]
     result = {}
     for key in keys:
@@ -1260,12 +1266,30 @@ async def get_menu_keyboard_settings() -> dict:
 async def save_menu_keyboard_settings(
     enabled: bool = None,
     btn_main: str = None,
+    btn_main_action: str = None,
     btn_help: str = None,
+    btn_help_action: str = None,
+    btn_3: str = None,
+    btn_3_action: str = None,
+    btn_4: str = None,
+    btn_4_action: str = None,
 ):
     """保存底部菜单键盘设置"""
     if enabled is not None:
         await set_bot_setting("menu_keyboard_enabled", "1" if enabled else "0")
     if btn_main is not None:
         await set_bot_setting("menu_btn_main", btn_main)
+    if btn_main_action is not None:
+        await set_bot_setting("menu_btn_main_action", btn_main_action)
     if btn_help is not None:
         await set_bot_setting("menu_btn_help", btn_help)
+    if btn_help_action is not None:
+        await set_bot_setting("menu_btn_help_action", btn_help_action)
+    if btn_3 is not None:
+        await set_bot_setting("menu_btn_3", btn_3)
+    if btn_3_action is not None:
+        await set_bot_setting("menu_btn_3_action", btn_3_action)
+    if btn_4 is not None:
+        await set_bot_setting("menu_btn_4", btn_4)
+    if btn_4_action is not None:
+        await set_bot_setting("menu_btn_4_action", btn_4_action)
