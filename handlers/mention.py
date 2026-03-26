@@ -4,8 +4,6 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from config import config
 from database import (
     get_quick_evaluation_stats,
-    get_user_rating,
-    save_quick_evaluation
 )
 
 logger = logging.getLogger(__name__)
@@ -37,8 +35,8 @@ async def mention_handler(message: Message):
     if text.startswith("#"):
         # 标签搜索逻辑
         try:
-            from handlers.search import handle_tag_search
-            await handle_tag_search(message)
+            from handlers.search import tag_search_handler
+            await tag_search_handler(message)
         except Exception as e:
             logger.warning(f"标签搜索处理失败：{e}")
         return
@@ -83,17 +81,17 @@ async def mention_handler(message: Message):
             [
                 InlineKeyboardButton(
                     text="👍 推荐",
-                    callback_data=f"quick_recommend|{username}"
+                    callback_data=f"rate:recommend:{username}"
                 ),
                 InlineKeyboardButton(
                     text="👎 不推荐",
-                    callback_data=f"quick_not_recommend|{username}"
+                    callback_data=f"rate:not_recommend:{username}"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="📝 写报告",
-                    callback_data=f"report_start|{username}"
+                    callback_data=f"report:start:{username}"
                 ),
                 InlineKeyboardButton(
                     text="❌ 取消",
@@ -118,54 +116,6 @@ async def mention_handler(message: Message):
         )
 
 
-@router.callback_query(lambda c: c.data.startswith("quick_recommend|"))
-async def handle_quick_recommend(callback, state):
-    """快速推荐"""
-    try:
-        username = callback.data.split("|")[1]
-        
-        await callback.message.edit_text(
-            f"请输入对 @{username} 的推荐理由\n\n"
-            f"（至少 12 个字符）"
-        )
-        
-        # 保存用户名到状态
-        await state.update_data(
-            quick_eval_username=username,
-            quick_eval_recommend=True
-        )
-        
-        await callback.answer()
-        
-    except Exception as e:
-        logger.error(f"快速推荐处理失败：{e}")
-        await callback.answer("❌ 处理失败", show_alert=True)
-
-
-@router.callback_query(lambda c: c.data.startswith("quick_not_recommend|"))
-async def handle_quick_not_recommend(callback, state):
-    """快速不推荐"""
-    try:
-        username = callback.data.split("|")[1]
-        
-        await callback.message.edit_text(
-            f"请输入对 @{username} 的不推荐理由\n\n"
-            f"（至少 12 个字符）"
-        )
-        
-        # 保存用户名到状态
-        await state.update_data(
-            quick_eval_username=username,
-            quick_eval_recommend=False
-        )
-        
-        await callback.answer()
-        
-    except Exception as e:
-        logger.error(f"快速不推荐处理失败：{e}")
-        await callback.answer("❌ 处理失败", show_alert=True)
-
-
 @router.callback_query(lambda c: c.data == "close_card")
 async def handle_close_card(callback):
     """关闭卡片"""
@@ -174,26 +124,3 @@ async def handle_close_card(callback):
         await callback.answer()
     except Exception as e:
         logger.error(f"关闭卡片失败：{e}")
-
-
-@router.callback_query(lambda c: c.data.startswith("report_start|"))
-async def handle_report_start(callback, state):
-    """开始写报告"""
-    try:
-        username = callback.data.split("|")[1]
-        
-        await callback.answer()
-        await callback.message.delete()
-        
-        # 开始报告流程
-        await callback.message.answer(
-            f"📝 开始为 @{username} 写报告\n\n"
-            f"第一步：您对 @{username} 的态度是？"
-        )
-        
-        # 保存用户名到状态
-        await state.update_data(report_target_username=username)
-        
-    except Exception as e:
-        logger.error(f"开始写报告失败：{e}")
-        await callback.answer("❌ 处理失败", show_alert=True)
