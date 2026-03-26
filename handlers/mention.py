@@ -1,5 +1,5 @@
 import logging
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from config import config
 from database import (
@@ -17,7 +17,7 @@ def is_admin(user_id: int) -> bool:
     return user_id in config.ADMIN_IDS
 
 
-@router.message()
+@router.message(F.text & (F.text.startswith("@") | F.text.regexp(r"#\w+")))
 async def mention_handler(message: Message):
     """
     处理提及用户名的消息

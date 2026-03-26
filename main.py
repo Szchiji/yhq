@@ -92,14 +92,14 @@ def register_handlers():
             menu          # 主菜单
         )
         
-        # 注册路由
-        dp.include_router(mention.router)
-        dp.include_router(report_form.router)
-        dp.include_router(quick_rate.router)
+        # 注册路由（命令处理器优先注册）
+        dp.include_router(menu.router)
         dp.include_router(admin.router)
         dp.include_router(template.router)
+        dp.include_router(report_form.router)
+        dp.include_router(quick_rate.router)
         dp.include_router(search.router)
-        dp.include_router(menu.router)
+        dp.include_router(mention.router)
         
         logger.info("✅ 所有处理器已注册")
         return True
