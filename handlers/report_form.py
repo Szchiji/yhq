@@ -34,39 +34,43 @@ router = Router()
 @router.callback_query(F.data.startswith("report:start:"))
 async def report_start(callback: CallbackQuery, state: FSMContext):
     """开始填写报告表单"""
-    username = callback.data.split(":", 2)[2]
-    user_id = callback.from_user.id
+    try:
+        username = callback.data.split(":", 2)[2]
+        user_id = callback.from_user.id
 
-    # 检查黑名单
-    if await is_blacklisted(user_id):
-        await callback.answer("❌ 您已被封禁，无法提交报告", show_alert=True)
-        return
+        # 检查黑名单
+        if await is_blacklisted(user_id):
+            await callback.answer("❌ 您已被封禁，无法提交报告", show_alert=True)
+            return
 
-    # 获取模板字段
-    fields = await get_template_fields()
-    if not fields:
-        await callback.answer("⚠️ 模板字段未配置，请联系管理员", show_alert=True)
-        return
+        # 获取模板字段
+        fields = await get_template_fields()
+        if not fields:
+            await callback.answer("⚠️ 模板字段未配置，请联系管理员", show_alert=True)
+            return
 
-    # 初始化状态
-    await state.set_state(ReportFormStates.filling_field)
-    await state.update_data(
-        teacher_username=username,
-        fields=fields,
-        current_field_index=0,
-        form_data={},
-        screenshots=[],
-        tags=[],
-    )
+        # 初始化状态
+        await state.set_state(ReportFormStates.filling_field)
+        await state.update_data(
+            teacher_username=username,
+            fields=fields,
+            current_field_index=0,
+            form_data={},
+            screenshots=[],
+            tags=[],
+        )
 
-    await callback.message.answer(
-        f"📝 **开始填写 @{username} 的评价报告**\n\n"
-        f"共需填写 {len(fields)} 个字段，请逐一回答。\n"
-        f"输入 /cancel 取消填写。",
-        parse_mode="Markdown",
-    )
-    await _ask_next_field(callback.message, state)
-    await callback.answer()
+        await callback.message.answer(
+            f"📝 **开始填写 @{username} 的评价报告**\n\n"
+            f"共需填写 {len(fields)} 个字段，请逐一回答。\n"
+            f"输入 /cancel 取消填写。",
+            parse_mode="Markdown",
+        )
+        await _ask_next_field(callback.message, state)
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"开始报告表单失败 (username={callback.data}, user={callback.from_user.id}): {e}", exc_info=True)
+        await callback.answer("❌ 操作失败，请稍后重试", show_alert=True)
 
 
 async def _ask_next_field(message: Message, state: FSMContext):

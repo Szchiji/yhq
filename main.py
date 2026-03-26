@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from aiogram import Dispatcher, Bot
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import BotCommand
 from aiohttp import web
 
 # 加载环境变量
@@ -49,6 +50,15 @@ async def startup():
         # 显示管理员列表
         if ADMIN_IDS:
             logger.info(f"✅ 管理员列表：{ADMIN_IDS}")
+        
+        # 设置机器人命令菜单
+        try:
+            await bot.set_my_commands([
+                BotCommand(command="start", description="🏠 打开主菜单"),
+            ])
+            logger.info("✅ 机器人命令菜单已设置")
+        except Exception as e:
+            logger.warning(f"⚠️ 设置命令菜单失败：{e}")
         
         # 尝试通知管理员机器人已启动
         if ADMIN_IDS:
@@ -200,7 +210,7 @@ async def webhook_mode():
             """处理 Webhook 请求"""
             try:
                 update_data = await request.json()
-                await dp.feed_update(bot, update_data)
+                await dp.feed_raw_update(bot, update_data)
                 return web.Response(text="ok")
             except Exception as e:
                 logger.error(f"❌ Webhook 处理失败：{e}", exc_info=True)
