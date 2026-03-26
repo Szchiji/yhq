@@ -9,7 +9,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.fsm.context import FSMContext
 
 from config import config
-from database import is_blacklisted, get_required_channels, get_total_stats
+from database import is_blacklisted, get_required_channels, get_total_stats, upsert_user, get_start_settings
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -59,6 +59,16 @@ async def start_handler(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
 
+    # 记录用户（用于广播）
+    try:
+        await upsert_user(
+            user_id=user_id,
+            user_name=message.from_user.username or "",
+            full_name=message.from_user.full_name or "",
+        )
+    except Exception as e:
+        logger.warning(f"记录用户失败：{e}")
+
     # 检查黑名单
     if await is_blacklisted(user_id):
         await message.answer("❌ 您已被列入黑名单，无法使用本机器人。")
@@ -104,13 +114,34 @@ async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
 
 
 async def show_main_menu(message: Message):
-    """展示主菜单"""
+    """展示主菜单（支持自定义欢迎文本和图片）"""
     user_id = message.from_user.id
-    await message.answer(
-        _build_menu_text(),
-        reply_markup=_build_menu_keyboard(user_id),
-        parse_mode="Markdown",
-    )
+
+    # 尝试读取自定义欢迎设置
+    try:
+        settings = await get_start_settings()
+        custom_text = settings.get("start_welcome_text") or ""
+        photo_file_id = settings.get("start_photo_file_id") or ""
+    except Exception:
+        custom_text = ""
+        photo_file_id = ""
+
+    text = custom_text if custom_text else _build_menu_text()
+    kb = _build_menu_keyboard(user_id)
+
+    if photo_file_id:
+        try:
+            await message.answer_photo(
+                photo=photo_file_id,
+                caption=text,
+                reply_markup=kb,
+                parse_mode="Markdown",
+            )
+            return
+        except Exception as e:
+            logger.warning(f"发送欢迎图片失败：{e}")
+
+    await message.answer(text, reply_markup=kb, parse_mode="Markdown")
 
 
 def _build_menu_text() -> str:

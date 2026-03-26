@@ -99,7 +99,9 @@ def register_handlers():
             admin,        # 管理员菜单
             template,     # 模板管理
             search,       # 标签搜索
-            menu          # 主菜单
+            menu,         # 主菜单
+            broadcast,    # 广播系统
+            settings,     # 自定义设置
         )
         
         # 注册路由（命令处理器优先注册）
@@ -109,6 +111,8 @@ def register_handlers():
         dp.include_router(report_form.router)
         dp.include_router(quick_rate.router)
         dp.include_router(search.router)
+        dp.include_router(broadcast.router)
+        dp.include_router(settings.router)
         dp.include_router(mention.router)
         
         logger.info("✅ 所有处理器已注册")

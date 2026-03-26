@@ -180,6 +180,35 @@ async def _create_tables_sqlite(conn):
             reason TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         );
+
+        -- 广播记录
+        CREATE TABLE IF NOT EXISTS broadcasts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL,
+            content_type TEXT NOT NULL DEFAULT 'text',
+            text TEXT,
+            file_id TEXT,
+            sent_count INTEGER DEFAULT 0,
+            failed_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- 机器人自定义设置
+        CREATE TABLE IF NOT EXISTS bot_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            setting_key TEXT NOT NULL UNIQUE,
+            setting_value TEXT,
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- 用户记录（用于广播）
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL UNIQUE,
+            user_name TEXT,
+            full_name TEXT,
+            last_seen TEXT DEFAULT (datetime('now'))
+        );
     """)
     await conn.commit()
 
@@ -271,6 +300,29 @@ async def _create_tables_pg(conn):
             reason TEXT,
             created_at TIMESTAMP DEFAULT NOW()
         );
+        CREATE TABLE IF NOT EXISTS broadcasts (
+            id SERIAL PRIMARY KEY,
+            sender_id BIGINT NOT NULL,
+            content_type TEXT NOT NULL DEFAULT 'text',
+            text TEXT,
+            file_id TEXT,
+            sent_count INT DEFAULT 0,
+            failed_count INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS bot_settings (
+            id SERIAL PRIMARY KEY,
+            setting_key TEXT NOT NULL UNIQUE,
+            setting_value TEXT,
+            updated_at TIMESTAMP DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT NOT NULL UNIQUE,
+            user_name TEXT,
+            full_name TEXT,
+            last_seen TIMESTAMP DEFAULT NOW()
+        );
     """)
 
 
@@ -352,6 +404,29 @@ async def _create_tables_mysql(conn):
                 user_name VARCHAR(255),
                 reason TEXT,
                 created_at DATETIME DEFAULT NOW()
+            ) CHARACTER SET utf8mb4""",
+            """CREATE TABLE IF NOT EXISTS broadcasts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sender_id BIGINT NOT NULL,
+                content_type VARCHAR(50) NOT NULL DEFAULT 'text',
+                text TEXT,
+                file_id TEXT,
+                sent_count INT DEFAULT 0,
+                failed_count INT DEFAULT 0,
+                created_at DATETIME DEFAULT NOW()
+            ) CHARACTER SET utf8mb4""",
+            """CREATE TABLE IF NOT EXISTS bot_settings (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                setting_key VARCHAR(100) NOT NULL UNIQUE,
+                setting_value TEXT,
+                updated_at DATETIME DEFAULT NOW()
+            ) CHARACTER SET utf8mb4""",
+            """CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id BIGINT NOT NULL UNIQUE,
+                user_name VARCHAR(255),
+                full_name VARCHAR(255),
+                last_seen DATETIME DEFAULT NOW()
             ) CHARACTER SET utf8mb4""",
         ]
         for sql in tables:
@@ -1035,3 +1110,135 @@ async def get_total_stats() -> dict:
         "published_reports": published_count,
         "teacher_count": teacher_count,
     }
+
+
+# ============================================================
+# 用户追踪操作（用于广播）
+# ============================================================
+
+async def upsert_user(user_id: int, user_name: str = "", full_name: str = ""):
+    """插入或更新用户记录"""
+    db = await get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    cursor = await db.execute(
+        "SELECT id FROM users WHERE user_id = ?", (user_id,)
+    )
+    row = await cursor.fetchone()
+    if row:
+        await db.execute(
+            "UPDATE users SET user_name = ?, full_name = ?, last_seen = ? WHERE user_id = ?",
+            (user_name or "", full_name or "", now, user_id),
+        )
+    else:
+        await db.execute(
+            "INSERT INTO users (user_id, user_name, full_name, last_seen) VALUES (?, ?, ?, ?)",
+            (user_id, user_name or "", full_name or "", now),
+        )
+    await db.commit()
+
+
+async def get_all_users() -> list:
+    """获取所有用户列表（用于广播）"""
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT user_id, user_name, full_name FROM users ORDER BY last_seen DESC"
+    )
+    rows = await cursor.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def get_user_count() -> int:
+    """获取用户总数"""
+    db = await get_db()
+    cursor = await db.execute("SELECT COUNT(*) as cnt FROM users")
+    row = await cursor.fetchone()
+    return row["cnt"] if row else 0
+
+
+# ============================================================
+# 广播操作
+# ============================================================
+
+async def save_broadcast(
+    sender_id: int,
+    content_type: str,
+    text: str = "",
+    file_id: str = "",
+    sent_count: int = 0,
+    failed_count: int = 0,
+) -> int:
+    """保存广播记录，返回广播 ID"""
+    db = await get_db()
+    cursor = await db.execute(
+        """INSERT INTO broadcasts (sender_id, content_type, text, file_id, sent_count, failed_count)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (sender_id, content_type, text or "", file_id or "", sent_count, failed_count),
+    )
+    await db.commit()
+    return cursor.lastrowid
+
+
+async def get_broadcasts(limit: int = 20) -> list:
+    """获取广播历史记录"""
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT id, sender_id, content_type, text, sent_count, failed_count, created_at
+           FROM broadcasts ORDER BY created_at DESC LIMIT ?""",
+        (limit,),
+    )
+    rows = await cursor.fetchall()
+    return [dict(row) for row in rows]
+
+
+# ============================================================
+# 机器人设置操作
+# ============================================================
+
+async def get_bot_setting(key: str) -> Optional[str]:
+    """获取机器人设置值"""
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT setting_value FROM bot_settings WHERE setting_key = ?",
+        (key,),
+    )
+    row = await cursor.fetchone()
+    return row["setting_value"] if row else None
+
+
+async def set_bot_setting(key: str, value: str):
+    """设置机器人设置值"""
+    db = await get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    cursor = await db.execute(
+        "SELECT id FROM bot_settings WHERE setting_key = ?", (key,)
+    )
+    row = await cursor.fetchone()
+    if row:
+        await db.execute(
+            "UPDATE bot_settings SET setting_value = ?, updated_at = ? WHERE setting_key = ?",
+            (value, now, key),
+        )
+    else:
+        await db.execute(
+            "INSERT INTO bot_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)",
+            (key, value, now),
+        )
+    await db.commit()
+
+
+async def get_start_settings() -> dict:
+    """获取 /start 欢迎页设置"""
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT setting_key, setting_value FROM bot_settings WHERE setting_key LIKE 'start_%'"
+    )
+    rows = await cursor.fetchall()
+    return {row["setting_key"]: row["setting_value"] for row in rows}
+
+
+async def save_start_settings(welcome_text: str = None, photo_file_id: str = None):
+    """保存 /start 欢迎页设置"""
+    if welcome_text is not None:
+        await set_bot_setting("start_welcome_text", welcome_text)
+    if photo_file_id is not None:
+        await set_bot_setting("start_photo_file_id", photo_file_id)
