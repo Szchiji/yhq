@@ -78,6 +78,18 @@ python main.py
 4. 设置环境变量（见下方说明）
 5. 部署完成！
 
+> ⚠️ **重要：Railway 部署数据持久化**
+>
+> Railway 等容器平台的文件系统是**临时的（Ephemeral）**，容器重启或重新部署后 SQLite 数据库文件会丢失，
+> 导致所有通过管理后台配置的内容（频道、模板字段、预定义标签、欢迎文本等）消失。
+>
+> **解决方案（推荐）**：在 Railway 中添加 PostgreSQL 插件，然后设置以下环境变量：
+> ```env
+> DATABASE_TYPE=postgresql
+> DATABASE_URL=postgresql://user:password@host:5432/database_name
+> ```
+> Railway PostgreSQL 插件会自动提供 `DATABASE_URL` 变量，将其值复制并设置 `DATABASE_TYPE=postgresql` 即可。
+
 ## 🔑 环境变量
 
 | 变量名 | 必填 | 说明 | 示例 |

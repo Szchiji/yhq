@@ -130,6 +130,21 @@ async def init_database():
         # ✅ 修复：添加 await
         await init_db()
         logger.info("✅ 数据库初始化完成")
+
+        # 如果使用 SQLite，提示持久化注意事项
+        db_type = os.getenv("DATABASE_TYPE", "sqlite")
+        if db_type == "sqlite":
+            # 检测是否在容器/云环境中运行
+            is_railway = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PROJECT_ID"))
+            is_container = bool(os.getenv("DYNO") or os.getenv("K_SERVICE") or os.getenv("WEBSITE_INSTANCE_ID"))
+            if is_railway or is_container:
+                logger.warning(
+                    "⚠️ 检测到容器/云环境，当前使用 SQLite 数据库。\n"
+                    "SQLite 数据文件在容器重启后可能丢失，导致所有配置消失。\n"
+                    "强烈建议切换到 PostgreSQL：设置 DATABASE_TYPE=postgresql 和 DATABASE_URL。\n"
+                    "详见 README.md 的「数据库支持」章节。"
+                )
+
         return True
     except Exception as e:
         logger.error(f"❌ 数据库初始化失败：{e}")
