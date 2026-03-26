@@ -37,3 +37,21 @@ class TemplateStates(StatesGroup):
     editing_header = State()          # 编辑头部
     editing_footer = State()          # 编辑尾部
     adding_tag = State()              # 添加标签
+
+
+class SearchStates(StatesGroup):
+    """搜索状态"""
+    searching = State()               # 正在搜索
+
+
+class BroadcastStates(StatesGroup):
+    """广播状态"""
+    composing = State()               # 正在编写广播内容
+    confirming = State()              # 确认发送
+
+
+class SettingsStates(StatesGroup):
+    """自定义设置状态"""
+    editing_start_text = State()      # 编辑 /start 欢迎文本
+    editing_start_photo = State()     # 编辑 /start 欢迎图片
+    editing_start_buttons = State()   # 编辑自定义按钮

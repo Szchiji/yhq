@@ -95,6 +95,10 @@ def _admin_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📈 数据统计", callback_data="admin:stats"),
         ],
         [
+            InlineKeyboardButton(text="📣 广播系统", callback_data="admin:broadcast"),
+            InlineKeyboardButton(text="⚙️ 自定义设置", callback_data="admin:settings"),
+        ],
+        [
             InlineKeyboardButton(text="🔙 返回主菜单", callback_data="main_menu"),
         ],
     ])
