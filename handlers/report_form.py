@@ -2,6 +2,7 @@
 报告表单处理模块
 系统 B：详细报告，包含预约截图和标签
 """
+import html
 import logging
 
 from aiogram import Router, F
@@ -61,10 +62,10 @@ async def report_start(callback: CallbackQuery, state: FSMContext):
         )
 
         await callback.message.answer(
-            f"📝 **开始填写 @{username} 的评价报告**\n\n"
+            f"📝 <b>开始填写 @{html.escape(username)} 的评价报告</b>\n\n"
             f"共需填写 {len(fields)} 个字段，请逐一回答。\n"
             f"输入 /cancel 取消填写。",
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         await _ask_next_field(callback.message, state)
         await callback.answer()
@@ -96,10 +97,10 @@ async def _ask_next_field(message: Message, state: FSMContext):
     ]])
 
     await message.answer(
-        f"📋 **字段 {index + 1}/{len(fields)}：{label}{required_mark}**\n\n"
+        f"📋 <b>字段 {index + 1}/{len(fields)}：{html.escape(label)}{required_mark}</b>\n\n"
         f"请输入该字段的内容：",
         reply_markup=kb,
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
 
@@ -162,12 +163,12 @@ async def _start_screenshot_upload(message: Message, state: FSMContext):
     ])
 
     await message.answer(
-        f"📸 **上传预约截图**\n\n"
+        f"📸 <b>上传预约截图</b>\n\n"
         f"请上传 {config.MIN_SCREENSHOTS}-{config.MAX_SCREENSHOTS} 张预约截图（必填）\n"
         f"截图用于证明预约真实性\n\n"
         f"上传完成后点击【✅ 截图已上传完毕】",
         reply_markup=kb,
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
 
@@ -254,19 +255,19 @@ async def _start_tag_input(message: Message, state: FSMContext):
 
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
-    predefined_hint = f"\n预定义标签：{' '.join('#'+t for t in predefined[:8])}" if predefined else ""
+    predefined_hint = f"\n预定义标签：{' '.join('#'+html.escape(t) for t in predefined[:8])}" if predefined else ""
 
     await message.answer(
-        f"🏷 **添加标签** {required_text}\n\n"
+        f"🏷 <b>添加标签</b> {required_text}\n\n"
         f"标签有助于其他用户搜索报告\n"
         f"最多添加 {max_tags} 个标签\n"
         f"{predefined_hint}\n\n"
-        f"**方法：**\n"
+        f"<b>方法：</b>\n"
         f"• 点击预定义标签直接添加\n"
-        f"• 输入 `#标签名` 自定义添加\n"
+        f"• 输入 <code>#标签名</code> 自定义添加\n"
         f"完成后点击【✅ 完成标签】",
         reply_markup=kb,
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
 
@@ -364,19 +365,19 @@ async def _show_preview(message: Message, state: FSMContext):
     tags = data.get("tags", [])
 
     text = (
-        f"📋 **报告预览**\n"
+        f"📋 <b>报告预览</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 教师：@{teacher_username}\n\n"
+        f"👤 教师：@{html.escape(teacher_username)}\n\n"
     )
 
     for field in fields:
         key = field["field_key"]
         label = field["field_label"]
         value = form_data.get(key, "（未填写）")
-        text += f"**{label}：**{value}\n"
+        text += f"<b>{html.escape(label)}：</b>{html.escape(value)}\n"
 
     if tags:
-        text += f"\n🏷 标签：{' '.join('#'+t for t in tags)}"
+        text += f"\n🏷 标签：{' '.join('#'+html.escape(t) for t in tags)}"
 
     text += f"\n📸 预约截图：{len(screenshots)} 张"
     text += "\n━━━━━━━━━━━━━━━━━━━━"
@@ -388,7 +389,7 @@ async def _show_preview(message: Message, state: FSMContext):
         ],
     ])
 
-    await message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
 
 @router.callback_query(F.data == "form:submit")
@@ -419,12 +420,12 @@ async def submit_report(callback: CallbackQuery, state: FSMContext):
     await state.clear()
 
     await callback.message.edit_text(
-        f"✅ **报告已提交！**\n\n"
+        f"✅ <b>报告已提交！</b>\n\n"
         f"报告 ID：#{report_id}\n"
-        f"教师：@{teacher_username}\n\n"
+        f"教师：@{html.escape(teacher_username)}\n\n"
         f"⏳ 等待管理员审核，审核通过后将推送到报告频道。\n"
         f"您将收到审核结果通知。",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     await callback.answer("✅ 已提交")
     logger.info(f"用户 {user_id} 提交了关于 @{teacher_username} 的报告 #{report_id}")

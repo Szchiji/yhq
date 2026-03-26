@@ -2,6 +2,7 @@
 快速评价处理模块
 系统 A：快速推荐或不推荐
 """
+import html
 import logging
 
 from aiogram import Router, F
@@ -69,10 +70,10 @@ async def quick_rate_start(callback: CallbackQuery, state: FSMContext):
         ]])
 
         await callback.message.answer(
-            f"{emoji} **您选择了：{action_text} @{username}**\n\n"
+            f"{emoji} <b>您选择了：{action_text} @{html.escape(username)}</b>\n\n"
             f"请输入您的评价理由（至少 {config.MIN_REASON_LENGTH} 个字）：",
             reply_markup=kb,
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         await callback.answer()
     except Exception as e:
@@ -87,9 +88,9 @@ async def receive_reason(message: Message, state: FSMContext):
 
     if len(reason) < config.MIN_REASON_LENGTH:
         await message.answer(
-            f"⚠️ 理由太短了！请输入至少 **{config.MIN_REASON_LENGTH}** 个字的评价理由。\n"
+            f"⚠️ 理由太短了！请输入至少 <b>{config.MIN_REASON_LENGTH}</b> 个字的评价理由。\n"
             f"当前字数：{len(reason)} 字",
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         return
 
@@ -117,12 +118,12 @@ async def receive_reason(message: Message, state: FSMContext):
     action_text = "推荐" if is_recommended else "不推荐"
 
     await message.answer(
-        f"✅ **评价已保存！**\n\n"
-        f"{emoji} 您对 **@{teacher_username}** 的评价：{action_text}\n"
-        f"📝 理由：{reason}\n\n"
-        f"📊 **最新统计：**\n"
+        f"✅ <b>评价已保存！</b>\n\n"
+        f"{emoji} 您对 <b>@{html.escape(teacher_username)}</b> 的评价：{action_text}\n"
+        f"📝 理由：{html.escape(reason)}\n\n"
+        f"📊 <b>最新统计：</b>\n"
         f"• 总评价数：{stats['total']}\n"
         f"• 推荐：{stats['recommended']} | 不推荐：{stats['not_recommended']}",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     logger.info(f"用户 {user_id} 对 @{teacher_username} 进行了{'推荐' if is_recommended else '不推荐'}评价")
