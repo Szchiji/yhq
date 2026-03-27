@@ -13,10 +13,32 @@ from aiogram.types import (
 from aiogram.fsm.context import FSMContext
 
 from config import config
-from database import is_blacklisted, get_required_channels, get_total_stats, upsert_user, get_start_settings, get_menu_keyboard_settings
+from database import is_blacklisted, get_required_channels, get_total_stats, upsert_user, get_start_settings, get_menu_keyboard_settings, get_ranking
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+# 可用的按钮动作映射
+AVAILABLE_ACTIONS = {
+    "main_menu": "🏠 首页",
+    "help": "❓ 帮助",
+    "ranking": "🏆 排行榜",
+    "start_report": "📝 写报告",
+}
+
+# 每个用户最后一条导航消息 ID（用于编辑更新而非新建，限制最大 10000 个用户以防内存泄漏）
+_last_nav_msg: dict[int, int] = {}
+_LAST_NAV_MSG_MAXSIZE = 10_000
+
+
+def _set_nav_msg(user_id: int, message_id: int) -> None:
+    """记录用户最后的导航消息 ID，超出上限时清除最旧的条目"""
+    if len(_last_nav_msg) >= _LAST_NAV_MSG_MAXSIZE:
+        # 删除最旧的一半以避免频繁清理
+        to_delete = list(_last_nav_msg.keys())[: _LAST_NAV_MSG_MAXSIZE // 2]
+        for k in to_delete:
+            _last_nav_msg.pop(k, None)
+    _last_nav_msg[user_id] = message_id
 
 
 async def check_subscription(bot, user_id: int) -> list:
@@ -109,16 +131,21 @@ async def verify_subscription_callback(callback: CallbackQuery, state: FSMContex
 async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
     """返回主菜单"""
     await state.clear()
-    await callback.message.edit_text(
-        _build_menu_text(),
-        reply_markup=_build_menu_keyboard(callback.from_user.id),
-        parse_mode="Markdown",
-    )
+    user_id = callback.from_user.id
+    try:
+        await callback.message.edit_text(
+            _build_menu_text(),
+            reply_markup=_build_menu_keyboard(user_id),
+            parse_mode="Markdown",
+        )
+        _set_nav_msg(user_id, callback.message.message_id)
+    except Exception:
+        pass
     await callback.answer()
 
 
 async def show_main_menu(message: Message):
-    """展示主菜单（支持自定义欢迎文本和图片）"""
+    """展示主菜单（支持自定义欢迎文本和图片，合并底部键盘，不重复发送通知）"""
     user_id = message.from_user.id
 
     # 尝试读取自定义欢迎设置
@@ -131,28 +158,27 @@ async def show_main_menu(message: Message):
         photo_file_id = ""
 
     text = custom_text if custom_text else _build_menu_text()
-    inline_kb = _build_menu_keyboard(user_id)
-    reply_kb = await _build_reply_keyboard()
+    reply_kb = await _build_reply_keyboard(user_id)
+
+    # 如果底部键盘已启用，主消息使用底部键盘（省去独立通知消息）
+    # 如果未启用，使用内联键盘
+    markup = reply_kb if reply_kb else _build_menu_keyboard(user_id)
 
     if photo_file_id:
         try:
-            await message.answer_photo(
+            msg = await message.answer_photo(
                 photo=photo_file_id,
                 caption=text,
-                reply_markup=inline_kb,
+                reply_markup=markup,
                 parse_mode="Markdown",
             )
-            # Set the reply keyboard with a separate activation message
-            if reply_kb:
-                await message.answer("⌨️ 底部快捷菜单已就绪", reply_markup=reply_kb)
+            _set_nav_msg(user_id, msg.message_id)
             return
         except Exception as e:
             logger.warning(f"发送欢迎图片失败：{e}")
 
-    await message.answer(text, reply_markup=inline_kb, parse_mode="Markdown")
-    # Set the reply keyboard with a separate activation message
-    if reply_kb:
-        await message.answer("⌨️ 底部快捷菜单已就绪", reply_markup=reply_kb)
+    msg = await message.answer(text, reply_markup=markup, parse_mode="Markdown")
+    _set_nav_msg(user_id, msg.message_id)
 
 
 def _build_menu_text() -> str:
@@ -171,6 +197,7 @@ def _build_menu_text() -> str:
 
 
 def _build_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """内联键盘（底部键盘禁用时使用）"""
     buttons = []
     if config.is_admin(user_id):
         buttons.append([
@@ -182,26 +209,65 @@ def _build_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-async def _build_reply_keyboard() -> ReplyKeyboardMarkup | None:
-    """构建底部快捷菜单键盘（从数据库读取设置）"""
+async def _build_reply_keyboard(user_id: int) -> ReplyKeyboardMarkup | None:
+    """构建底部快捷菜单键盘（从数据库读取配置，支持最多 4 个自定义按钮）"""
     try:
         settings = await get_menu_keyboard_settings()
-        # 默认启用（首次使用时 setting 值为 None，视为启用）
         enabled_val = settings.get("menu_keyboard_enabled")
         if enabled_val == "0":
             return None
-        btn_main = settings.get("menu_btn_main") or "🏠 主菜单"
-        btn_help = settings.get("menu_btn_help") or "❓ 帮助"
+
+        # 收集已配置的按钮（文本非空）
+        slots = [
+            (settings.get("menu_btn_main") or "🏠 首页",     settings.get("menu_btn_main_action") or "main_menu"),
+            (settings.get("menu_btn_help") or "❓ 帮助",     settings.get("menu_btn_help_action") or "help"),
+            (settings.get("menu_btn_3") or "",               settings.get("menu_btn_3_action") or "ranking"),
+            (settings.get("menu_btn_4") or "",               settings.get("menu_btn_4_action") or "start_report"),
+        ]
+
+        buttons_list: list[str] = []
+        for text, _ in slots:
+            if text.strip():
+                buttons_list.append(text.strip())
+
+        # 管理员额外获得管理员菜单按钮
+        if config.is_admin(user_id):
+            buttons_list.append("🛠 管理员菜单")
+
+        if not buttons_list:
+            return None
+
+        # 每行排 2 个按钮
+        keyboard = []
+        for i in range(0, len(buttons_list), 2):
+            row = [KeyboardButton(text=buttons_list[i])]
+            if i + 1 < len(buttons_list):
+                row.append(KeyboardButton(text=buttons_list[i + 1]))
+            keyboard.append(row)
+
         return ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text=btn_main), KeyboardButton(text=btn_help)],
-            ],
+            keyboard=keyboard,
             resize_keyboard=True,
             is_persistent=True,
         )
     except Exception as e:
         logger.warning(f"构建底部菜单键盘失败：{e}")
         return None
+
+
+async def _build_ranking_text() -> str:
+    """构建公开排行榜文本"""
+    from config import config as cfg
+    rankings = await get_ranking(cfg.RANKING_LIMIT)
+    if not rankings:
+        return "🏆 **推荐排行榜**\n\n暂无数据"
+    text = "🏆 **推荐排行榜**\n━━━━━━━━━━━━━━━━━━━━\n"
+    for i, r in enumerate(rankings, 1):
+        total = r.get("total", 0)
+        recommended = r.get("recommended", 0)
+        pct = int(recommended / total * 100) if total > 0 else 0
+        text += f"{i}. @{r['teacher_username']} — 👍{recommended}/{total}（{pct}%）\n"
+    return text
 
 
 @router.callback_query(F.data == "help")
@@ -239,15 +305,38 @@ async def help_callback(callback: CallbackQuery):
 # 底部快捷菜单键盘按钮处理器
 # ============================================================
 
-async def _get_reply_button_texts() -> tuple[str, str]:
-    """获取底部菜单按钮文本"""
+async def _get_all_reply_buttons() -> list[tuple[str, str]]:
+    """获取所有底部菜单按钮（文本, 动作）列表"""
     try:
         settings = await get_menu_keyboard_settings()
-        btn_main = settings.get("menu_btn_main") or "🏠 主菜单"
-        btn_help = settings.get("menu_btn_help") or "❓ 帮助"
-        return btn_main, btn_help
+        slots = [
+            (settings.get("menu_btn_main") or "🏠 首页",     settings.get("menu_btn_main_action") or "main_menu"),
+            (settings.get("menu_btn_help") or "❓ 帮助",     settings.get("menu_btn_help_action") or "help"),
+            (settings.get("menu_btn_3") or "",               settings.get("menu_btn_3_action") or "ranking"),
+            (settings.get("menu_btn_4") or "",               settings.get("menu_btn_4_action") or "start_report"),
+        ]
+        return [(text.strip(), action) for text, action in slots if text.strip()]
     except Exception:
-        return "🏠 主菜单", "❓ 帮助"
+        return [("🏠 首页", "main_menu"), ("❓ 帮助", "help")]
+
+
+async def _navigate(message: Message, text: str, kb: InlineKeyboardMarkup, user_id: int):
+    """导航辅助：优先编辑上一条导航消息，失败则新建"""
+    last_id = _last_nav_msg.get(user_id)
+    if last_id:
+        try:
+            await message.bot.edit_message_text(
+                text,
+                chat_id=message.chat.id,
+                message_id=last_id,
+                reply_markup=kb,
+                parse_mode="Markdown",
+            )
+            return
+        except Exception:
+            pass  # 编辑失败（消息太旧等），回退到新建
+    msg = await message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    _set_nav_msg(user_id, msg.message_id)
 
 
 @router.message(
@@ -260,17 +349,32 @@ async def _get_reply_button_texts() -> tuple[str, str]:
 async def reply_keyboard_handler(message: Message, state: FSMContext):
     """处理底部快捷菜单按钮文本消息（仅在无活动状态的私聊中生效）"""
     text = message.text or ""
-    btn_main, btn_help = await _get_reply_button_texts()
+    user_id = message.from_user.id
+    all_buttons = await _get_all_reply_buttons()
 
-    if text == btn_main:
-        await state.clear()
-        user_id = message.from_user.id
-        await message.answer(
-            _build_menu_text(),
-            reply_markup=_build_menu_keyboard(user_id),
-            parse_mode="Markdown",
-        )
-    elif text == btn_help:
+    # 检查是否匹配配置的按钮
+    matched_action = None
+    for btn_text, action in all_buttons:
+        if text == btn_text:
+            matched_action = action
+            break
+
+    # 也检查管理员按钮
+    if text == "🛠 管理员菜单" and config.is_admin(user_id):
+        matched_action = "admin"
+
+    if matched_action is None:
+        return  # 不是底部菜单按钮，忽略
+
+    await state.clear()
+
+    if matched_action == "main_menu":
+        menu_text = _build_menu_text()
+        # 当底部键盘启用时，返回主页使用内联键盘（方便管理员访问管理入口）
+        kb = _build_menu_keyboard(user_id)
+        await _navigate(message, menu_text, kb, user_id)
+
+    elif matched_action == "help":
         help_text = (
             "📖 **使用帮助**\n\n"
             "**1️⃣ 查询教师评价**\n"
@@ -295,4 +399,29 @@ async def reply_keyboard_handler(message: Message, state: FSMContext):
         kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="🔙 返回主菜单", callback_data="main_menu")
         ]])
-        await message.answer(help_text, reply_markup=kb, parse_mode="Markdown")
+        await _navigate(message, help_text, kb, user_id)
+
+    elif matched_action == "ranking":
+        ranking_text = await _build_ranking_text()
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🔙 返回主菜单", callback_data="main_menu")
+        ]])
+        await _navigate(message, ranking_text, kb, user_id)
+
+    elif matched_action == "start_report":
+        prompt_text = (
+            "📝 **写报告**\n\n"
+            "请先在群组中输入 `@用户名` 查询该教师，\n"
+            "然后点击统计卡片上的【📝 写报告】按钮开始填写。\n\n"
+            "💡 例如：在群组输入 `@teacher123`"
+        )
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🔙 返回主菜单", callback_data="main_menu")
+        ]])
+        await _navigate(message, prompt_text, kb, user_id)
+
+    elif matched_action == "admin":
+        if config.is_admin(user_id):
+            from handlers.admin import _admin_menu_text, _admin_menu_keyboard
+            await _navigate(message, _admin_menu_text(), _admin_menu_keyboard(), user_id)
+

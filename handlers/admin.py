@@ -304,12 +304,23 @@ async def approve_report_callback(callback: CallbackQuery):
     teacher = report["teacher_username"]
     submitter_id = report["submitter_id"]
 
-    await callback.message.edit_text(
+    result_text = (
         f"✅ **报告 #{report_id} 已通过审核**\n\n"
         f"发布 ID：#{published_id}\n"
-        f"教师：@{teacher}",
-        parse_mode="Markdown",
+        f"教师：@{teacher}"
     )
+    # 兼容图片消息（截图审核时回调附在图片上）
+    try:
+        if callback.message.photo or callback.message.document:
+            await callback.message.edit_caption(result_text, parse_mode="Markdown")
+        else:
+            await callback.message.edit_text(result_text, parse_mode="Markdown")
+    except Exception as e:
+        logger.warning(f"编辑审核消息失败：{e}")
+        try:
+            await callback.message.answer(result_text, parse_mode="Markdown")
+        except Exception:
+            pass
 
     # 推送到报告频道
     report_channels = await get_report_channels()
@@ -388,10 +399,19 @@ async def reject_report_callback(callback: CallbackQuery):
         submitter_id = report["submitter_id"]
         teacher = report["teacher_username"]
 
-        await callback.message.edit_text(
-            f"❌ **报告 #{report_id} 已驳回**\n教师：@{teacher}",
-            parse_mode="Markdown",
-        )
+        result_text = f"❌ **报告 #{report_id} 已驳回**\n教师：@{teacher}"
+        # 兼容图片消息（截图审核时回调附在图片上）
+        try:
+            if callback.message.photo or callback.message.document:
+                await callback.message.edit_caption(result_text, parse_mode="Markdown")
+            else:
+                await callback.message.edit_text(result_text, parse_mode="Markdown")
+        except Exception as e:
+            logger.warning(f"编辑驳回消息失败：{e}")
+            try:
+                await callback.message.answer(result_text, parse_mode="Markdown")
+            except Exception:
+                pass
 
         # 通知提交者
         try:

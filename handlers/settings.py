@@ -211,24 +211,149 @@ async def menu_keyboard_menu(callback: CallbackQuery):
     settings = await get_menu_keyboard_settings()
     enabled_val = settings.get("menu_keyboard_enabled")
     enabled = enabled_val != "0"  # None 或 "1" 均视为启用
-    btn_main = settings.get("menu_btn_main") or "🏠 主菜单"
-    btn_help = settings.get("menu_btn_help") or "❓ 帮助"
     status = "✅ 已启用" if enabled else "❌ 已禁用"
     toggle_text = "🔴 禁用键盘" if enabled else "🟢 启用键盘"
     toggle_action = "settings:menu_kb_disable" if enabled else "settings:menu_kb_enable"
 
+    # 读取各按钮配置
+    btn_main = settings.get("menu_btn_main") or "🏠 首页"
+    btn_main_action = settings.get("menu_btn_main_action") or "main_menu"
+    btn_help = settings.get("menu_btn_help") or "❓ 帮助"
+    btn_help_action = settings.get("menu_btn_help_action") or "help"
+    btn_3 = settings.get("menu_btn_3") or ""
+    btn_3_action = settings.get("menu_btn_3_action") or "ranking"
+    btn_4 = settings.get("menu_btn_4") or ""
+    btn_4_action = settings.get("menu_btn_4_action") or "start_report"
+
+    action_names = {
+        "main_menu": "首页", "help": "帮助",
+        "ranking": "排行榜", "start_report": "写报告",
+    }
+
+    def btn_line(text: str, action: str, slot: str) -> str:
+        a = action_names.get(action, action)
+        if text:
+            return f"[{text}]→{a}"
+        return f"（未设置）→{a}"
+
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=toggle_text, callback_data=toggle_action)],
-        [InlineKeyboardButton(text=f"✏️ 「主菜单」按钮文本：{btn_main}", callback_data="settings:menu_kb_btn_main")],
-        [InlineKeyboardButton(text=f"✏️ 「帮助」按钮文本：{btn_help}", callback_data="settings:menu_kb_btn_help")],
+        [InlineKeyboardButton(
+            text=f"✏️ 按钮1：{btn_line(btn_main, btn_main_action, '1')}",
+            callback_data="settings:menu_kb_slot:1"
+        )],
+        [InlineKeyboardButton(
+            text=f"✏️ 按钮2：{btn_line(btn_help, btn_help_action, '2')}",
+            callback_data="settings:menu_kb_slot:2"
+        )],
+        [InlineKeyboardButton(
+            text=f"✏️ 按钮3：{btn_line(btn_3, btn_3_action, '3')}",
+            callback_data="settings:menu_kb_slot:3"
+        )],
+        [InlineKeyboardButton(
+            text=f"✏️ 按钮4：{btn_line(btn_4, btn_4_action, '4')}",
+            callback_data="settings:menu_kb_slot:4"
+        )],
         [InlineKeyboardButton(text="🔙 返回设置", callback_data="admin:settings")],
     ])
     await callback.message.edit_text(
         f"⌨️ <b>底部菜单键盘设置</b>\n\n"
-        f"状态：{status}\n"
-        f"当前按钮：[{btn_main}] [{btn_help}]\n\n"
-        f"底部菜单键盘会在用户发送 /start 后显示在聊天底部，"
-        f"方便用户快速访问常用功能。",
+        f"状态：{status}\n\n"
+        f"支持最多 4 个按钮，每个按钮可配置显示文字和触发功能。\n"
+        f"按钮3和按钮4文字留空则不显示。\n"
+        f"可用功能：首页 / 帮助 / 排行榜 / 写报告",
+        reply_markup=kb,
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("settings:menu_kb_slot:"))
+async def edit_menu_kb_slot(callback: CallbackQuery, state: FSMContext):
+    """编辑指定编号的按钮（文字和动作）"""
+    if not config.is_admin(callback.from_user.id):
+        await callback.answer("❌ 无权限", show_alert=True)
+        return
+
+    slot = callback.data.split(":")[-1]  # "1" / "2" / "3" / "4"
+    settings = await get_menu_keyboard_settings()
+
+    slot_map = {
+        "1": ("menu_btn_main", "menu_btn_main_action", "🏠 首页", "main_menu"),
+        "2": ("menu_btn_help", "menu_btn_help_action", "❓ 帮助", "help"),
+        "3": ("menu_btn_3",    "menu_btn_3_action",    "",        "ranking"),
+        "4": ("menu_btn_4",    "menu_btn_4_action",    "",        "start_report"),
+    }
+    if slot not in slot_map:
+        await callback.answer("❌ 无效插槽", show_alert=True)
+        return
+
+    text_key, action_key, default_text, default_action = slot_map[slot]
+    current_text = settings.get(text_key) or default_text
+    current_action = settings.get(action_key) or default_action
+
+    await state.set_state(SettingsStates.editing_start_buttons)
+    await state.update_data(editing_slot=slot, editing_step="text", current_action=current_action)
+
+    action_names = {
+        "main_menu": "首页", "help": "帮助",
+        "ranking": "排行榜", "start_report": "写报告",
+    }
+
+    # 动作选择按钮
+    action_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🏠 首页", callback_data=f"settings:menu_kb_action:{slot}:main_menu"),
+            InlineKeyboardButton(text="❓ 帮助", callback_data=f"settings:menu_kb_action:{slot}:help"),
+        ],
+        [
+            InlineKeyboardButton(text="🏆 排行榜", callback_data=f"settings:menu_kb_action:{slot}:ranking"),
+            InlineKeyboardButton(text="📝 写报告", callback_data=f"settings:menu_kb_action:{slot}:start_report"),
+        ],
+        [InlineKeyboardButton(text="❌ 取消", callback_data="settings:menu_keyboard")],
+    ])
+    await callback.message.edit_text(
+        f"✏️ <b>编辑按钮 {slot}</b>\n\n"
+        f"当前文字：{current_text or '（未设置）'}\n"
+        f"当前功能：{action_names.get(current_action, current_action)}\n\n"
+        f"请先选择此按钮触发的功能，然后再输入按钮显示文字：",
+        reply_markup=action_kb,
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("settings:menu_kb_action:"))
+async def set_menu_kb_action(callback: CallbackQuery, state: FSMContext):
+    """选择按钮动作后，请求用户输入按钮文字"""
+    if not config.is_admin(callback.from_user.id):
+        await callback.answer("❌ 无权限", show_alert=True)
+        return
+
+    parts = callback.data.split(":")  # settings:menu_kb_action:{slot}:{action}
+    slot = parts[3]
+    action = parts[4]
+
+    action_names = {
+        "main_menu": "首页", "help": "帮助",
+        "ranking": "排行榜", "start_report": "写报告",
+    }
+    action_label = action_names.get(action, action)
+
+    slot_defaults = {"1": "🏠 首页", "2": "❓ 帮助", "3": "🏆 排行榜", "4": "📝 写报告"}
+    default_text = slot_defaults.get(slot, "")
+
+    await state.set_state(SettingsStates.editing_start_buttons)
+    await state.update_data(editing_slot=slot, editing_step="text", pending_action=action)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ 取消", callback_data="settings:menu_keyboard")],
+    ])
+    clear_note = "\n如需清除此按钮，请输入「-」" if slot in ("3", "4") else ""
+    await callback.message.edit_text(
+        f"✏️ <b>按钮 {slot} → {action_label}</b>\n\n"
+        f"请输入按钮的显示文字（可包含 emoji，建议不超过 10 个字符）：\n"
+        f"例：🏆 排行榜{clear_note}",
         reply_markup=kb,
         parse_mode="HTML",
     )
@@ -257,68 +382,49 @@ async def disable_menu_keyboard(callback: CallbackQuery):
     await menu_keyboard_menu(callback)
 
 
-@router.callback_query(F.data == "settings:menu_kb_btn_main")
-async def edit_menu_btn_main(callback: CallbackQuery, state: FSMContext):
-    """编辑「主菜单」按钮文本"""
-    if not config.is_admin(callback.from_user.id):
-        await callback.answer("❌ 无权限", show_alert=True)
-        return
-    await state.set_state(SettingsStates.editing_start_buttons)
-    await state.update_data(editing_btn="main")
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ 取消", callback_data="settings:cancel")],
-    ])
-    await callback.message.answer(
-        "✏️ <b>编辑「主菜单」按钮文本</b>\n\n"
-        "请输入新的按钮文字（可包含 emoji，建议不超过 10 个字符）：\n"
-        "默认值：🏠 主菜单",
-        reply_markup=kb,
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data == "settings:menu_kb_btn_help")
-async def edit_menu_btn_help(callback: CallbackQuery, state: FSMContext):
-    """编辑「帮助」按钮文本"""
-    if not config.is_admin(callback.from_user.id):
-        await callback.answer("❌ 无权限", show_alert=True)
-        return
-    await state.set_state(SettingsStates.editing_start_buttons)
-    await state.update_data(editing_btn="help")
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ 取消", callback_data="settings:cancel")],
-    ])
-    await callback.message.answer(
-        "✏️ <b>编辑「帮助」按钮文本</b>\n\n"
-        "请输入新的按钮文字（可包含 emoji，建议不超过 10 个字符）：\n"
-        "默认值：❓ 帮助",
-        reply_markup=kb,
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
 @router.message(SettingsStates.editing_start_buttons, F.text)
 async def receive_menu_button_text(message: Message, state: FSMContext):
-    """接收新的按钮文本"""
+    """接收新的按钮文字并保存到指定插槽"""
     new_text = message.text.strip()
+    data = await state.get_data()
+    slot = data.get("editing_slot", "1")
+    pending_action = data.get("pending_action", "")
+    await state.clear()
+
+    slot_map = {
+        "1": ("menu_btn_main", "menu_btn_main_action"),
+        "2": ("menu_btn_help", "menu_btn_help_action"),
+        "3": ("menu_btn_3",    "menu_btn_3_action"),
+        "4": ("menu_btn_4",    "menu_btn_4_action"),
+    }
+    text_kwarg, action_kwarg = slot_map.get(slot, ("btn_main", "btn_main_action"))
+
+    # 允许用按「-」清除按钮3/4
+    if new_text == "-" and slot in ("3", "4"):
+        await save_menu_keyboard_settings(**{text_kwarg: ""})
+        await message.answer(f"✅ 按钮 {slot} 已清除")
+        logger.info(f"管理员 {message.from_user.id} 清除了按钮 {slot}")
+        return
+
     if not new_text:
-        await message.answer("⚠️ 按钮文本不能为空")
+        await message.answer("⚠️ 按钮文字不能为空")
         return
 
     if len(new_text) > 20:
-        await message.answer("⚠️ 按钮文本不能超过 20 个字符")
+        await message.answer("⚠️ 按钮文字不能超过 20 个字符")
         return
 
-    data = await state.get_data()
-    editing_btn = data.get("editing_btn", "main")
-    await state.clear()
+    kwargs: dict = {text_kwarg: new_text}
+    if pending_action:
+        kwargs[action_kwarg] = pending_action
 
-    if editing_btn == "main":
-        await save_menu_keyboard_settings(btn_main=new_text)
-        await message.answer(f"✅ 「主菜单」按钮文本已更新为：{new_text}")
-    else:
-        await save_menu_keyboard_settings(btn_help=new_text)
-        await message.answer(f"✅ 「帮助」按钮文本已更新为：{new_text}")
-    logger.info(f"管理员 {message.from_user.id} 更新了底部菜单按钮文本")
+    await save_menu_keyboard_settings(**kwargs)
+
+    action_names = {
+        "main_menu": "首页", "help": "帮助",
+        "ranking": "排行榜", "start_report": "写报告",
+    }
+    action_label = action_names.get(pending_action, pending_action) if pending_action else ""
+    suffix = f"（功能：{action_label}）" if action_label else ""
+    await message.answer(f"✅ 按钮 {slot} 已更新为：{new_text}{suffix}")
+    logger.info(f"管理员 {message.from_user.id} 更新了按钮 {slot}：{new_text} → {pending_action}")
