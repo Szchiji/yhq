@@ -89,8 +89,6 @@ async def view_report_callback(callback: CallbackQuery):
     """查看完整报告"""
     report_id = int(callback.data.split(":", 2)[2])
 
-    from database import get_pending_report_by_id
-    # 在已发布报告中查找
     from database import get_db
     import json
 

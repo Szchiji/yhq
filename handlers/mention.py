@@ -25,13 +25,13 @@ async def mention_handler(message: Message):
     """
     if not message.text:
         return
-    
+
     text = message.text.strip()
-    
+
     # ════════════════════════════════════════════════════
     # 处理标签搜索 (#标签)
     # ════════════════════════════════════════════════════
-    
+
     if text.startswith("#"):
         # 标签搜索逻辑
         try:
@@ -40,30 +40,30 @@ async def mention_handler(message: Message):
         except Exception as e:
             logger.warning(f"标签搜索处理失败：{e}")
         return
-    
+
     # ════════════════════════════════════════════════════
     # 处理用户查询 (@username)
     # ════════════════════════════════════════════════════
-    
+
     # 提取 @username
     if not text.startswith("@"):
         return
-    
+
     # 移除 @ 符号
     username = text[1:].split()[0]  # 只取第一个单词
-    
+
     if not username or len(username) < 2:
         return
-    
+
     try:
         # 获取统计数据
         stats = await get_quick_evaluation_stats(username)
-        
+
         # 建立统计卡片
         recommend_count = stats.get("recommend_count", 0)
         not_recommend_count = stats.get("not_recommend_count", 0)
         avg_score = stats.get("avg_score", 0)
-        
+
         # 使用纯文本格式（不用 Markdown）
         card_text = (
             f"👤 @{username}\n"
@@ -75,7 +75,7 @@ async def mention_handler(message: Message):
             f"\n"
             f"选择操作："
         )
-        
+
         # 建立按钮
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [
@@ -99,15 +99,15 @@ async def mention_handler(message: Message):
                 )
             ]
         ])
-        
+
         # 发送卡片（纯文本，不使用 parse_mode）
         await message.reply(
             card_text,
             reply_markup=kb
         )
-        
+
         logger.info(f"显示用户 @{username} 的统计卡片")
-        
+
     except Exception as e:
         logger.error(f"处理用户查询失败：{e}", exc_info=True)
         await message.reply(

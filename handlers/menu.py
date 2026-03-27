@@ -13,7 +13,7 @@ from aiogram.types import (
 from aiogram.fsm.context import FSMContext
 
 from config import config
-from database import is_blacklisted, get_required_channels, get_total_stats, upsert_user, get_start_settings, get_menu_keyboard_settings, get_ranking
+from database import is_blacklisted, get_required_channels, upsert_user, get_start_settings, get_menu_keyboard_settings, get_ranking
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -424,4 +424,3 @@ async def reply_keyboard_handler(message: Message, state: FSMContext):
         if config.is_admin(user_id):
             from handlers.admin import _admin_menu_text, _admin_menu_keyboard
             await _navigate(message, _admin_menu_text(), _admin_menu_keyboard(), user_id)
-

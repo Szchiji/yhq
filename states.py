@@ -25,8 +25,8 @@ class AdminStates(StatesGroup):
     managing_blacklist = State()      # 管理黑名单
     adding_channel = State()          # 添加频道
     editing_template = State()        # 编辑模板
-    editing_template_header = State() # 编辑模板头部
-    editing_template_footer = State() # 编辑模板尾部
+    editing_template_header = State()  # 编辑模板头部
+    editing_template_footer = State()  # 编辑模板尾部
     adding_predefined_tag = State()   # 添加预定义标签
     setting_field_name = State()      # 设置字段名称
 
