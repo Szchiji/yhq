@@ -21,7 +21,6 @@ _db_conn = None
 
 async def get_db():
     """获取数据库连接"""
-    global _db_conn
     if _db_conn is None:
         await init_db()
     return _db_conn

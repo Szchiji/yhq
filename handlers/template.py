@@ -8,7 +8,6 @@ import re
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
-from aiogram.filters import StateFilter
 
 from config import config
 from database import (
@@ -189,7 +188,7 @@ async def manage_predefined_tags(callback: CallbackQuery):
     buttons = []
     for tag in tags:
         buttons.append([
-            InlineKeyboardButton(text=f"#{tag}", callback_data=f"template:noop"),
+            InlineKeyboardButton(text=f"#{tag}", callback_data="template:noop"),
             InlineKeyboardButton(text="🗑 删除", callback_data=f"template:del_tag:{tag}"),
         ])
 

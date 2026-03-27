@@ -18,7 +18,6 @@ from database import (
     get_start_settings,
     save_start_settings,
     get_bot_setting,
-    set_bot_setting,
     get_menu_keyboard_settings,
     save_menu_keyboard_settings,
 )
@@ -353,7 +352,7 @@ async def set_menu_kb_action(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         f"✏️ <b>按钮 {slot} → {action_label}</b>\n\n"
         f"请输入按钮的显示文字（可包含 emoji，建议不超过 10 个字符）：\n"
-        f"例：🏆 排行榜{clear_note}",
+        f"例：{default_text}{clear_note}",
         reply_markup=kb,
         parse_mode="HTML",
     )

@@ -46,11 +46,11 @@ async def startup():
         # 获取机器人信息
         bot_info = await bot.get_me()
         logger.info(f"✅ 机器人已启动：@{bot_info.username} ({bot_info.first_name})")
-        
+
         # 显示管理员列表
         if ADMIN_IDS:
             logger.info(f"✅ 管理员列表：{ADMIN_IDS}")
-        
+
         # 设置机器人命令菜单
         try:
             await bot.set_my_commands([
@@ -59,7 +59,7 @@ async def startup():
             logger.info("✅ 机器人命令菜单已设置")
         except Exception as e:
             logger.warning(f"⚠️ 设置命令菜单失败：{e}")
-        
+
         # 尝试通知管理员机器人已启动
         if ADMIN_IDS:
             for admin_id in ADMIN_IDS:
@@ -74,7 +74,7 @@ async def startup():
                     )
                 except Exception as e:
                     logger.warning(f"⚠️ 无法通知管理员 {admin_id}：{e}")
-        
+
         return True
     except Exception as e:
         logger.error(f"❌ 启动失败：{e}")
@@ -103,7 +103,7 @@ def register_handlers():
             broadcast,    # 广播系统
             settings,     # 自定义设置
         )
-        
+
         # 注册路由（命令处理器优先注册）
         dp.include_router(menu.router)
         dp.include_router(admin.router)
@@ -114,7 +114,7 @@ def register_handlers():
         dp.include_router(broadcast.router)
         dp.include_router(settings.router)
         dp.include_router(mention.router)
-        
+
         logger.info("✅ 所有处理器已注册")
         return True
     except ImportError as e:
@@ -160,7 +160,7 @@ async def polling_mode():
     logger.info("=" * 50)
     logger.info("📡 启动 Polling 模式（轮询）")
     logger.info("=" * 50)
-    
+
     try:
         # 删除任何存在的 webhook
         try:
@@ -168,14 +168,14 @@ async def polling_mode():
             logger.info("✅ Webhook 已删除")
         except Exception as e:
             logger.warning(f"⚠️ Webhook 删除提示：{e}")
-        
+
         # 启动前的准备
         if not await startup():
             return False
-        
+
         logger.info("🚀 开始轮询消息...")
-        logger.info(f"📍 Polling 模式已激活")
-        
+        logger.info("📍 Polling 模式已激活")
+
         try:
             await dp.start_polling(
                 bot,
@@ -185,7 +185,7 @@ async def polling_mode():
         except Exception as e:
             logger.error(f"❌ Polling 失败：{e}")
             raise
-    
+
     except Exception as e:
         logger.error(f"❌ Polling 模式出错：{e}", exc_info=True)
         return False
@@ -202,17 +202,17 @@ async def webhook_mode():
     logger.info("=" * 50)
     logger.info("🔗 启动 Webhook 模式")
     logger.info("=" * 50)
-    
+
     if not WEBHOOK_URL:
         logger.error("❌ Webhook 模式需要设置 WEBHOOK_URL 环境变量！")
         logger.error("例如：WEBHOOK_URL=https://yourdomain.com")
         exit(1)
-    
+
     try:
         # 启动前的准备
         if not await startup():
             return False
-        
+
         # 设置 Webhook
         webhook_info = await bot.set_webhook(
             url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
@@ -220,10 +220,10 @@ async def webhook_mode():
         )
         logger.info(f"✅ Webhook 已设置：{WEBHOOK_URL}{WEBHOOK_PATH}")
         logger.info(f"📍 Webhook 信息：{webhook_info}")
-        
+
         # 创建 aiohttp Web 应用
         app = web.Application()
-        
+
         # Webhook 处理器
         async def webhook_handler(request: web.Request) -> web.Response:
             """处理 Webhook 请求"""
@@ -234,32 +234,32 @@ async def webhook_mode():
             except Exception as e:
                 logger.error(f"❌ Webhook 处理失败：{e}", exc_info=True)
                 return web.Response(text="error", status=400)
-        
+
         # 健康检查处理器
         async def health_handler(request: web.Request) -> web.Response:
             """健康检查端点"""
             return web.Response(text="healthy")
-        
+
         # 添加路由
         app.router.add_post(WEBHOOK_PATH, webhook_handler)
         app.router.add_get("/health", health_handler)
-        
+
         logger.info(f"🚀 Webhook 服务器启动：{WEBHOOK_HOST}:{WEBHOOK_PORT}")
         logger.info(f"📍 Webhook 路径：{WEBHOOK_PATH}")
         logger.info(f"📍 健康检查：http://{WEBHOOK_HOST}:{WEBHOOK_PORT}/health")
-        
+
         # 启动 Web 服务器
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, WEBHOOK_HOST, WEBHOOK_PORT)
         await site.start()
-        
+
         logger.info("✅ Webhook 模式已启动，等待来自 Telegram 的消息...")
-        
+
         # 保持运行
         while True:
             await asyncio.sleep(3600)
-    
+
     except Exception as e:
         logger.error(f"❌ Webhook 模式出错：{e}", exc_info=True)
         return False
@@ -276,7 +276,7 @@ async def hybrid_mode():
     logger.info("=" * 50)
     logger.info("🔄 启动混合模式（自动选择）")
     logger.info("=" * 50)
-    
+
     # 如果有 WEBHOOK_URL，使用 Webhook；否则使用 Polling
     if WEBHOOK_URL:
         logger.info("🔗 检测到 WEBHOOK_URL，使用 Webhook 模式")
@@ -297,15 +297,15 @@ async def main():
         if not await init_database():
             logger.error("❌ 数据库初始化失败，退出")
             return False
-        
+
         # Step 2：注册处理器
         if not register_handlers():
             logger.error("❌ 处理器注册失败，退出")
             return False
-        
+
         # Step 3：根据模式启动
         logger.info(f"📌 当前模式：{MODE.upper()}")
-        
+
         if MODE.lower() == "webhook":
             await webhook_mode()
         elif MODE.lower() == "polling":
@@ -316,7 +316,7 @@ async def main():
             logger.error(f"❌ 未知的模式：{MODE}")
             logger.error("✅ 可用模式：polling, webhook, hybrid")
             return False
-        
+
     except Exception as e:
         logger.error(f"❌ 致命错误：{e}", exc_info=True)
         return False
@@ -327,9 +327,9 @@ if __name__ == "__main__":
         logger.info("=" * 50)
         logger.info("🤖 狼评机器人启动中...")
         logger.info("=" * 50)
-        
+
         asyncio.run(main())
-        
+
     except KeyboardInterrupt:
         logger.info("\n⚠️ 收到中止信���，正在关闭...")
     except Exception as e:
