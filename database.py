@@ -792,6 +792,43 @@ async def update_published_report_message_ids(report_id: int, message_ids: list)
     await db.commit()
 
 
+async def get_published_reports_by_teacher(teacher_username: str, limit: int = 20) -> list:
+    """获取指定教师的已发布报告列表"""
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT id, teacher_username, submitter_name, form_data, tags, published_at
+           FROM published_reports
+           WHERE teacher_username = ?
+           ORDER BY published_at DESC
+           LIMIT ?""",
+        (teacher_username, limit),
+    )
+    rows = await cursor.fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["form_data"] = json.loads(d["form_data"])
+        d["tags"] = json.loads(d["tags"])
+        result.append(d)
+    return result
+
+
+async def get_published_report_by_id(report_id: int) -> Optional[dict]:
+    """根据 ID 获取单条已发布报告"""
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM published_reports WHERE id = ?",
+        (report_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["form_data"] = json.loads(d["form_data"])
+    d["tags"] = json.loads(d["tags"])
+    return d
+
+
 # ============================================================
 # 模板操作
 # ============================================================

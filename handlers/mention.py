@@ -94,6 +94,12 @@ async def mention_handler(message: Message):
                     callback_data=f"report:start:{username}"
                 ),
                 InlineKeyboardButton(
+                    text="📋 查看报告",
+                    callback_data=f"rpt:page:{username}:0"
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="❌ 取消",
                     callback_data="close_card"
                 )
