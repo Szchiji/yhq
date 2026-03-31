@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  bot:
+    build: .
+    container_name: yhq_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - yhq_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: yhq_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - yhq_network
+    command: redis-server --appendonly yes
+
+volumes:
+  redis_data:
+
+networks:
+  yhq_network:
+    driver: bridge
