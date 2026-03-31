@@ -10,6 +10,7 @@ from handlers import (
     quick_rate,
     search,
     mention,
+    mention_report,
     broadcast,
     settings,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "quick_rate",
     "search",
     "mention",
+    "mention_report",
     "broadcast",
     "settings",
 ]
