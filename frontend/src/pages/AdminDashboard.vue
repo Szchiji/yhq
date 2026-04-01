@@ -31,6 +31,67 @@
         </button>
       </div>
 
+      <!-- Report Template Tab -->
+      <div v-if="activeTab === 'template'" class="tab-content">
+        <div class="card">
+          <div class="section-title">📋 报告模板字段</div>
+          <p style="font-size: 13px; color: var(--tg-theme-hint-color); margin-bottom: 12px;">
+            自定义用户填写报告时需要填写的附加字段，字段将在报告表单中动态展示。
+          </p>
+
+          <div v-if="config.reportTemplate.fields.length === 0" style="color: var(--tg-theme-hint-color); font-size: 13px; margin-bottom: 12px;">
+            暂无自定义字段，点击下方按钮添加。
+          </div>
+
+          <div v-for="(field, i) in config.reportTemplate.fields" :key="i" class="template-field-row">
+            <div class="form-group" style="margin-bottom: 6px;">
+              <label style="font-size: 12px;">字段名（英文，唯一标识）</label>
+              <input v-model="field.name" class="form-control" placeholder="如：project_name" />
+            </div>
+            <div class="form-group" style="margin-bottom: 6px;">
+              <label style="font-size: 12px;">显示标签</label>
+              <input v-model="field.label" class="form-control" placeholder="如：项目名称" />
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+              <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                <label style="font-size: 12px;">字段类型</label>
+                <select v-model="field.type" class="form-control">
+                  <option value="text">单行文本</option>
+                  <option value="textarea">多行文本</option>
+                  <option value="select">下拉选择</option>
+                </select>
+              </div>
+              <div class="form-group" style="flex: 0 0 auto; margin-bottom: 0; display: flex; align-items: flex-end;">
+                <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; padding-bottom: 2px;">
+                  <input type="checkbox" v-model="field.required" />
+                  必填
+                </label>
+              </div>
+            </div>
+            <div v-if="field.type === 'select'" class="form-group" style="margin-bottom: 6px;">
+              <label style="font-size: 12px;">选项（每行一个）</label>
+              <textarea
+                class="form-control"
+                rows="3"
+                :value="(field.options || []).join('\n')"
+                @input="field.options = $event.target.value.split('\n').map(o => o.trim()).filter(Boolean)"
+                placeholder="选项1&#10;选项2&#10;选项3"
+              ></textarea>
+            </div>
+            <button class="btn btn-danger" style="width: auto; font-size: 12px;" @click="removeTemplateField(i)">🗑 删除此字段</button>
+          </div>
+
+          <button class="btn btn-primary" style="margin-top: 8px;" @click="addTemplateField">+ 添加字段</button>
+        </div>
+
+        <div v-if="saveMsg" class="alert" :class="saveMsg.type === 'success' ? 'alert-success' : 'alert-error'">
+          {{ saveMsg.text }}
+        </div>
+        <button class="btn btn-primary" @click="saveConfig" :disabled="saving">
+          {{ saving ? '保存中...' : '💾 保存模板' }}
+        </button>
+      </div>
+
       <!-- Basic Config Tab -->
       <div v-if="activeTab === 'config'" class="tab-content">
         <div class="card">
@@ -188,7 +249,8 @@ const reviewNotes = reactive({})
 
 const tabs = [
   { key: 'config', label: '⚙️ 配置' },
-  { key: 'reports', label: '📋 报告审核' },
+  { key: 'template', label: '📋 报告模板' },
+  { key: 'reports', label: '📝 报告审核' },
 ]
 
 const statuses = [
@@ -208,6 +270,9 @@ const config = reactive({
     buttons: [],
   },
   keyboards: [],
+  reportTemplate: {
+    fields: [],
+  },
   reviewFeedback: {
     approved: '',
     rejected: '',
@@ -247,6 +312,22 @@ async function loadReports() {
 }
 
 async function saveConfig() {
+  // Validate template fields before saving
+  if (activeTab.value === 'template') {
+    const emptyName = config.reportTemplate.fields.find((f) => !f.name.trim())
+    if (emptyName) {
+      saveMsg.value = { type: 'error', text: '❌ 所有字段必须填写字段名（英文标识）' }
+      setTimeout(() => { saveMsg.value = null }, 3000)
+      return
+    }
+    const names = config.reportTemplate.fields.map((f) => f.name.trim())
+    const hasDuplicate = names.length !== new Set(names).size
+    if (hasDuplicate) {
+      saveMsg.value = { type: 'error', text: '❌ 字段名不能重复' }
+      setTimeout(() => { saveMsg.value = null }, 3000)
+      return
+    }
+  }
   saving.value = true
   saveMsg.value = null
   try {
@@ -290,6 +371,14 @@ function removeKeyboard(i) {
   config.keyboards.splice(i, 1)
 }
 
+function addTemplateField() {
+  config.reportTemplate.fields.push({ name: '', label: '', type: 'text', required: false, options: [] })
+}
+
+function removeTemplateField(i) {
+  config.reportTemplate.fields.splice(i, 1)
+}
+
 function statusLabel(s) {
   return { pending: '待审核', approved: '已通过', rejected: '已拒绝' }[s] || s
 }
@@ -331,4 +420,5 @@ onMounted(async () => {
 .report-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .review-actions { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; }
 .tag { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-right: 4px; }
+.template-field-row { margin-bottom: 16px; padding: 12px; background: var(--tg-theme-bg-color); border-radius: 8px; border: 1px solid rgba(0,0,0,0.08); }
 </style>
