@@ -1,0 +1,16 @@
+/* CSS Variables */
+:root {
+    --primary: #2d6cdf;
+    --primary-dark: #1a4fa0;
+    --secondary: #6c757d;
+    --success: #28a745;
+    --danger: #dc3545;
+    --warning: #ffc107;
+    --info: #17a2b8;
+    --light: #f8f9fa;
+    --dark: #343a40;
+    --white: #ffffff;
+    --border-radius: 8px;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --transition: all 0.2s ease;
+}

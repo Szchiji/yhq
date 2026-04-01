@@ -20,11 +20,25 @@ ENV/
 # Database
 *.db
 *.sqlite3
-data/
+data/*
+!data/.gitkeep
 
 # Logs
 *.log
-logs/
+logs/*
+!logs/.gitkeep
+
+# Backups
+backups/*
+!backups/.gitkeep
+
+# Node modules
+node_modules/
+miniapp/node_modules/
+
+# Pytest
+.pytest_cache/
+
 
 # OS
 .DS_Store
