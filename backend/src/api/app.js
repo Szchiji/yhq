@@ -68,6 +68,13 @@ function createApp(bot) {
   const frontendDist = path.join(__dirname, '../../frontend-dist');
   const fs = require('fs');
   if (fs.existsSync(frontendDist)) {
+    const staticLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 500,
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
+    app.use(staticLimiter);
     app.use(express.static(frontendDist));
     app.get('*', (req, res) => {
       res.sendFile(path.join(frontendDist, 'index.html'));

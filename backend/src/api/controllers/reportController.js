@@ -93,11 +93,18 @@ async function reviewReport(req, res) {
       return res.status(400).json({ success: false, message: '无效状态' });
     }
 
+    // Validate that id is a valid MongoDB ObjectId format
+    if (!/^[a-f\d]{24}$/i.test(id)) {
+      return res.status(400).json({ success: false, message: '无效的报告 ID' });
+    }
+
+    const safeReviewNote = typeof reviewNote === 'string' ? reviewNote.slice(0, 500) : '';
+
     const report = await Report.findByIdAndUpdate(
       id,
       {
         status,
-        reviewNote: reviewNote || '',
+        reviewNote: safeReviewNote,
         reviewedAt: new Date(),
         reviewedBy: config.ADMIN_ID,
       },
