@@ -6,6 +6,7 @@ WORKDIR /app
 # 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
@@ -24,9 +25,9 @@ RUN mkdir -p data backups logs
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)"
+# 健康检查（针对 API 模式；Bot 轮询模式无 HTTP 端口）
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:${API_PORT:-8000}/health || python -c "import sys; sys.exit(0)"
 
-# 运行应用
+# 运行应用（默认启动 Bot；docker-compose 中 api 服务会覆盖此命令）
 CMD ["python", "main.py"]

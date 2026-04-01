@@ -4,11 +4,6 @@ FSM 状态定义
 from aiogram.fsm.state import State, StatesGroup
 
 
-class QuickRateStates(StatesGroup):
-    """快速评价状态"""
-    waiting_for_reason = State()      # 等待输入评价理由
-
-
 class ReportFormStates(StatesGroup):
     """详细报告表单状态"""
     filling_field = State()           # 正在填写字段
@@ -42,16 +37,3 @@ class TemplateStates(StatesGroup):
 class SearchStates(StatesGroup):
     """搜索状态"""
     searching = State()               # 正在搜索
-
-
-class BroadcastStates(StatesGroup):
-    """广播状态"""
-    composing = State()               # 正在编写广播内容
-    confirming = State()              # 确认发送
-
-
-class SettingsStates(StatesGroup):
-    """自定义设置状态"""
-    editing_start_text = State()      # 编辑 /start 欢迎文本
-    editing_start_photo = State()     # 编辑 /start 欢迎图片
-    editing_start_buttons = State()   # 编辑自定义按钮

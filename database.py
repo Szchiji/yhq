@@ -558,16 +558,15 @@ async def get_recent_evaluations(teacher_username: str, limit: int = 5) -> list:
 
 
 async def get_ranking(limit: int = 10) -> list:
-    """获取推荐排行榜"""
+    """获取报告排行榜（按已发布报告数量排序）"""
     db = await get_db()
     cursor = await db.execute(
         """SELECT
                teacher_username,
-               COUNT(*) as total,
-               SUM(CASE WHEN is_recommended = 1 THEN 1 ELSE 0 END) as recommended
-           FROM quick_evaluations
+               COUNT(*) as report_count
+           FROM published_reports
            GROUP BY teacher_username
-           ORDER BY recommended DESC, total DESC
+           ORDER BY report_count DESC
            LIMIT ?""",
         (limit,),
     )

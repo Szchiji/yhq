@@ -13,7 +13,7 @@ from aiogram.types import (
 from aiogram.fsm.context import FSMContext
 
 from config import config
-from database import is_blacklisted, get_required_channels, upsert_user, get_start_settings, get_menu_keyboard_settings, get_ranking
+from database import is_blacklisted, get_required_channels, upsert_user, get_start_settings, get_menu_keyboard_settings
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -257,17 +257,16 @@ async def _build_reply_keyboard(user_id: int) -> ReplyKeyboardMarkup | None:
 
 
 async def _build_ranking_text() -> str:
-    """构建公开排行榜文本"""
+    """构建报告排行榜文本（按已发布报告数量排序）"""
     from config import config as cfg
+    from database import get_ranking
     rankings = await get_ranking(cfg.RANKING_LIMIT)
     if not rankings:
-        return "🏆 **推荐排行榜**\n\n暂无数据"
-    text = "🏆 **推荐排行榜**\n━━━━━━━━━━━━━━━━━━━━\n"
+        return "🏆 **报告排行榜**\n\n暂无已发布报告"
+    text = "🏆 **报告排行榜**\n━━━━━━━━━━━━━━━━━━━━\n"
     for i, r in enumerate(rankings, 1):
-        total = r.get("total", 0)
-        recommended = r.get("recommended", 0)
-        pct = int(recommended / total * 100) if total > 0 else 0
-        text += f"{i}. @{r['teacher_username']} — 👍{recommended}/{total}（{pct}%）\n"
+        count = r.get("report_count", 0)
+        text += f"{i}. @{r['teacher_username']} — 📄{count} 份报告\n"
     return text
 
 
