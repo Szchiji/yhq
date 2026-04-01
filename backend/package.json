@@ -1,0 +1,26 @@
+{
+  "name": "telegram-report-bot-backend",
+  "version": "1.0.0",
+  "description": "Telegram Report Management Bot Backend",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "express": "^4.18.2",
+    "mongoose": "^8.0.3",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.2",
+    "crypto": "^1.0.1",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

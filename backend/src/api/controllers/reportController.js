@@ -1,0 +1,176 @@
+const Report = require('../../models/Report');
+const Admin = require('../../models/Admin');
+const config = require('../../config');
+
+/**
+ * Submit a new report (from Mini App)
+ */
+async function submitReport(req, res) {
+  try {
+    const { userId, username, firstName, title, description, content, tags } = req.body;
+    const report = new Report({
+      userId,
+      username: username || '',
+      firstName: firstName || '',
+      title: title || '',
+      description: description || '',
+      content: content || {},
+      tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
+    });
+    await report.save();
+
+    // Notify admin
+    const bot = req.app.get('bot');
+    if (bot) {
+      await bot.telegram.sendMessage(
+        config.ADMIN_ID,
+        `📬 *新报告待审核*\n\n` +
+        `报告编号：No.${report.reportNumber}\n` +
+        `提交人：${firstName || ''} @${username || userId}\n` +
+        `标题：${title || '无标题'}\n` +
+        `标签：${report.tags.map((t) => `#${t}`).join(' ') || '无'}\n\n` +
+        `内容：${description || JSON.stringify(content).slice(0, 200)}\n\n` +
+        `请在管理后台审核此报告。`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '✅ 通过', callback_data: `approve_${report._id}` },
+                { text: '❌ 拒绝', callback_data: `reject_${report._id}` },
+              ],
+            ],
+          },
+        }
+      ).catch((e) => console.error('Failed to notify admin:', e.message));
+    }
+
+    // Notify user: pending
+    const admin = await Admin.findOne({ adminId: config.ADMIN_ID });
+    const pendingMsg = admin?.reviewFeedback?.pending || '⏳ 你的报告已提交，等待管理员审核。';
+    if (bot && userId) {
+      await bot.telegram.sendMessage(userId, pendingMsg).catch(() => {});
+    }
+
+    res.json({ success: true, data: report });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+/**
+ * Get all reports (admin)
+ */
+async function getReports(req, res) {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+    const query = status ? { status } : {};
+    const reports = await Report.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+    const total = await Report.countDocuments(query);
+    res.json({ success: true, data: reports, total, page: parseInt(page), limit: parseInt(limit) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+/**
+ * Review a report (approve/reject)
+ */
+async function reviewReport(req, res) {
+  try {
+    const { id } = req.params;
+    const { status, reviewNote } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: '无效状态' });
+    }
+
+    const report = await Report.findByIdAndUpdate(
+      id,
+      {
+        status,
+        reviewNote: reviewNote || '',
+        reviewedAt: new Date(),
+        reviewedBy: config.ADMIN_ID,
+      },
+      { new: true }
+    );
+
+    if (!report) {
+      return res.status(404).json({ success: false, message: '报告不存在' });
+    }
+
+    const bot = req.app.get('bot');
+    const adminConfig = await Admin.findOne({ adminId: config.ADMIN_ID });
+
+    if (status === 'approved') {
+      // Push to channel
+      if (bot && adminConfig?.pushChannelId) {
+        try {
+          const channelMsg = await bot.telegram.sendMessage(
+            adminConfig.pushChannelId,
+            `📋 *报告推送* No.${report.reportNumber}\n\n` +
+            `👤 @${report.username || '匿名'}\n` +
+            `📌 ${report.title || '无标题'}\n\n` +
+            `${report.description || ''}\n\n` +
+            (report.tags.length > 0 ? `🏷 ${report.tags.map((t) => `#${t}`).join(' ')}` : ''),
+            { parse_mode: 'Markdown' }
+          );
+          report.channelMessageId = channelMsg.message_id;
+          await report.save();
+        } catch (e) {
+          console.error('Failed to push to channel:', e.message);
+        }
+      }
+      // Notify user
+      const approvedMsg = adminConfig?.reviewFeedback?.approved || '✅ 你的报告已通过审核，已推送到频道。';
+      if (bot && report.userId) {
+        await bot.telegram.sendMessage(report.userId, approvedMsg).catch(() => {});
+      }
+    } else {
+      // Notify user of rejection
+      const rejectedMsg = (adminConfig?.reviewFeedback?.rejected || '❌ 你的报告未通过审核，请修改后重新提交。') +
+        (reviewNote ? `\n\n管理员备注：${reviewNote}` : '');
+      if (bot && report.userId) {
+        await bot.telegram.sendMessage(report.userId, rejectedMsg).catch(() => {});
+      }
+    }
+
+    res.json({ success: true, data: report });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+/**
+ * Search reports (public API for Mini App)
+ */
+async function searchReports(req, res) {
+  try {
+    const { q, type } = req.query;
+    if (!q) return res.json({ success: true, data: [] });
+
+    let query = { status: 'approved' };
+    if (type === 'username') {
+      query.username = { $regex: new RegExp(q.replace(/^@/, ''), 'i') };
+    } else if (type === 'tag') {
+      query.tags = { $regex: new RegExp(q.replace(/^#/, ''), 'i') };
+    } else {
+      query.$or = [
+        { username: { $regex: new RegExp(q.replace(/^@/, ''), 'i') } },
+        { tags: { $regex: new RegExp(q.replace(/^#/, ''), 'i') } },
+        { title: { $regex: new RegExp(q, 'i') } },
+      ];
+    }
+
+    const reports = await Report.find(query).sort({ createdAt: -1 }).limit(20);
+    res.json({ success: true, data: reports });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+module.exports = { submitReport, getReports, reviewReport, searchReports };
