@@ -21,9 +21,9 @@ def create_app():
 
     from api.routes import auth, reports, users, admin, health, miniapp
 
-    app = FastAPI(
+    fastapi_app = FastAPI(
         title="Report System API",
-        description="企业级报告系统 REST API",
+        description="报告管理系统 REST API",
         version="2.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
@@ -31,31 +31,36 @@ def create_app():
     )
 
     # CORS 中间件
-    app.add_middleware(
+    cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+    fastapi_app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
     # 注册路由
-    app.include_router(health.router, tags=["健康检查"])
-    app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
-    app.include_router(reports.router, prefix="/api/v1/reports", tags=["报告"])
-    app.include_router(users.router, prefix="/api/v1/users", tags=["用户"])
-    app.include_router(admin.router, prefix="/api/v1/admin", tags=["管理"])
-    app.include_router(miniapp.router, prefix="/miniapp", tags=["miniapp"])
+    fastapi_app.include_router(health.router, tags=["健康检查"])
+    fastapi_app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
+    fastapi_app.include_router(reports.router, prefix="/api/v1/reports", tags=["报告"])
+    fastapi_app.include_router(users.router, prefix="/api/v1/users", tags=["用户"])
+    fastapi_app.include_router(admin.router, prefix="/api/v1/admin", tags=["管理"])
+    fastapi_app.include_router(miniapp.router, prefix="/miniapp", tags=["miniapp"])
 
-    @app.on_event("startup")
+    @fastapi_app.on_event("startup")
     async def startup_event():
         logger.info("API 服务已启动")
 
-    @app.on_event("shutdown")
+    @fastapi_app.on_event("shutdown")
     async def shutdown_event():
         logger.info("API 服务已关闭")
 
-    return app
+    return fastapi_app
+
+
+# 模块级 app 实例，供 uvicorn 直接使用
+app = create_app()
 
 
 def run_api():
@@ -66,15 +71,13 @@ def run_api():
         logger.error("uvicorn 未安装，无法启动 API 服务。运行: pip install uvicorn")
         return
 
-    from core.config import core_config
-
-    app = create_app()
-    if app is None:
-        return
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("API_PORT", "8000"))
+    log_level = os.getenv("LOG_LEVEL", "info").lower()
 
     uvicorn.run(
         app,
-        host=core_config.API_HOST,
-        port=core_config.API_PORT,
-        log_level=core_config.LOG_LEVEL.lower(),
+        host=host,
+        port=port,
+        log_level=log_level,
     )

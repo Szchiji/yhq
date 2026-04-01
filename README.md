@@ -1,62 +1,73 @@
-# 教师评价平台 🎓
+# 报告管理系统 📊
 
-一个功能完整的 Telegram 教师评价机器人，支持快速评价、详细报告、预约截图验证、标签搜索等核心功能。
+一个功能完整的报告管理平台，集成 Telegram Bot 界面和 REST API，支持报告提交、审核、模板管理等核心功能。
 
-## 📊 核心功能
+## 🎯 核心功能
 
-### 系统 A：快速评价
-- 用户在群组中输入 `@用户名` 查询教师评价统计
-- 点击【👍推荐】或【👎不推荐】快速评价
-- 在机器人中输入一句话理由（≥12字）
-- 立即保存并展示到排行榜
+### Telegram Bot
+- **报告提交**：通过 `/start` 打开菜单，填写结构化报告表单（支持预约截图、标签）
+- **报告查询**：输入 `@用户名` 查看该用户的已发布报告列表
+- **标签搜索**：在群组中输入 `#标签` 搜索匹配的报告（支持多标签）
+- **管理员审核**：管理员通过/拒绝待审核报告，审核通过后自动推送到报告频道
+- **模板管理**：管理员自定义报告字段、头部/尾部、预定义标签
 
-### 系统 B：详细报告
-- 点击【📝写报告】进入详细表单
-- 逐步填写结构化的报告字段
-- **上传预约截图（1-3 张，必填）**
-- **输入标签（可选/必填，可配置）**
-- 预览报告内容并提交审核
-- 管理员审核通过后自动推送到报告频道
-- 用户收到发布成功通知
+### REST API (FastAPI)
+- `GET /health` — 健康检查
+- `GET /docs` — OpenAPI 文档（Swagger UI）
+- `POST /api/v1/auth/token` — 获取访问令牌
+- `GET /api/v1/reports/` — 报告列表
+- `GET /api/v1/reports/{id}` — 单个报告
+- `POST /api/v1/reports/{id}/approve` — 审核通过
+- `POST /api/v1/reports/{id}/reject` — 拒绝报告
+- `GET /api/v1/admin/stats` — 管理统计
+- `GET /api/v1/admin/blacklist` — 黑名单管理
 
-### 🔍 标签搜索功能
-- 用户在群组中输入 `#标签` 即可搜索
-- 支持多标签组合搜索（如 `#龙岗 #竹竹`）
-- 显示匹配的报告列表（最多 10 份）
-- 快速预览报告信息和查看完整内容
-
-### 🛠️ 完整的管理员菜单
-- **快速评价管理**：查看排行榜、搜索教师、删除数据
-- **报告审核**：审核待审核报告、查看预约截图、通过/驳回
-- **频道管理**：强制订阅频道、报告推送频道
-- **用户管理**：黑名单管理
-- **模板管理**：编辑字段显示名称和顺序、自定义模板头部/尾部、预定义标签维护
+### Miniapp
+- Web 前端（通过 Telegram WebApp 打开）
+- 报告提交、查询、管理员审核界面
 
 ## 📁 项目结构
 
 ```
-handlers/
-├── mention.py           # 统计卡片查询和快速操作
-├── report_form.py       # 报告表单处理（预约截图+标签）
-├── quick_rate.py        # 快速评价逻辑
-├── admin.py             # 管理员菜单和审核功能
-├── template.py          # 报告模板管理系统
-├── search.py            # 标签搜索功能
-└── menu.py              # 主菜单系统
-
-main.py                  # 应用入口
-database.py              # 数据库操作和查询
-config.py                # 配置管理
-states.py                # FSM 状态定义
-bot_instance.py          # 机器人实例
-requirements.txt         # Python 依赖包
-.env.example             # 环境变量示例
-railway.json             # Railway 部署配置
+├── main.py              # Telegram Bot 启动入口
+├── database.py          # 数据库操作（SQLite/PostgreSQL）
+├── config.py            # 配置管理
+├── states.py            # FSM 状态定义
+├── bot_instance.py      # Bot 实例
+│
+├── handlers/            # Telegram Bot 处理器
+│   ├── menu.py          # 主菜单
+│   ├── report_form.py   # 报告表单处理
+│   ├── admin.py         # 管理员菜单和审核
+│   ├── template.py      # 模板管理
+│   ├── mention_report.py # @用户名 报告查询
+│   └── search.py        # #标签 搜索
+│
+├── api/                 # FastAPI REST API
+│   ├── app.py           # FastAPI 应用（uvicorn 入口）
+│   └── routes/          # API 路由
+│       ├── health.py
+│       ├── auth.py
+│       ├── reports.py
+│       ├── users.py
+│       ├── admin.py
+│       └── miniapp.py
+│
+├── services/            # 业务逻辑服务
+├── models/              # 数据模型（Pydantic）
+├── utils/               # 工具库（JWT、缓存、限流等）
+├── core/                # 核心配置
+├── miniapp/             # Web 前端（Node.js）
+│
+├── Dockerfile           # Docker 镜像
+├── docker-compose.yml   # 编排（Bot + API + PostgreSQL + Redis）
+├── requirements.txt     # Python 依赖
+└── .env.example         # 环境变量示例
 ```
 
 ## 🚀 快速开始
 
-### 本地运行
+### 本地运行（仅 Bot）
 
 ```bash
 # 1. 安装依赖
@@ -70,136 +81,70 @@ cp .env.example .env
 python main.py
 ```
 
-### Railway 部署
+### Docker 部署（推荐）
 
-1. Fork 或 Clone 本仓库
-2. 在 [Railway](https://railway.app) 创建新项目
-3. 连接 GitHub 仓库
-4. 设置环境变量（见下方说明）
-5. 部署完成！
+```bash
+# 1. 配置环境变量
+cp .env.example .env
+# 编辑 .env，填入必要配置
 
-> ⚠️ **重要：Railway 部署数据持久化**
->
-> Railway 等容器平台的文件系统是**临时的（Ephemeral）**，容器重启或重新部署后 SQLite 数据库文件会丢失，
-> 导致所有通过管理后台配置的内容（频道、模板字段、预定义标签、欢迎文本等）消失。
->
-> **解决方案（推荐）**：在 Railway 中添加 PostgreSQL 插件，然后设置以下环境变量：
-> ```env
-> DATABASE_TYPE=postgresql
-> DATABASE_URL=postgresql://user:password@host:5432/database_name
-> ```
-> Railway PostgreSQL 插件会自动提供 `DATABASE_URL` 变量，将其值复制并设置 `DATABASE_TYPE=postgresql` 即可。
+# 2. 启动所有服务
+docker compose up -d
 
-## 🔑 环境变量
+# 3. 验证部署
+curl http://localhost:8000/health
+# 返回：{"status": "ok", ...}
 
-| 变量名 | 必填 | 说明 | 示例 |
-|--------|------|------|------|
-| `BOT_TOKEN` | ✅ | Telegram Bot Token | `123456:ABCDEF...` |
-| `ADMIN_IDS` | ✅ | 管理员 ID，逗号分隔 | `123456789,987654321` |
-| `DATABASE_TYPE` | ⬜ | 数据库类型 (sqlite/mysql/postgresql) | `sqlite` |
-| `REQUIRED_CHANNELS` | ⬜ | 强制订阅频道 ID，逗号分隔 | `-1001234567890` |
-| `REPORT_CHANNELS` | ⬜ | 报告推送频道 ID，逗号分隔 | `-1001234567890` |
-| `LOG_LEVEL` | ⬜ | 日志级别 | `INFO` |
-| `ENVIRONMENT` | ⬜ | 运行环境 | `production` |
-| `MIN_REASON_LENGTH` | ⬜ | 评价理由最小字数 | `12` |
-| `MIN_SCREENSHOTS` | ⬜ | 预约截图最小数量 | `1` |
-| `MAX_SCREENSHOTS` | ⬜ | 预约截图最大数量 | `3` |
-
-### 获取 BOT_TOKEN
-
-1. 打开 Telegram，搜索 `@BotFather`
-2. 发送 `/newbot`
-3. 按步骤创建机器人
-4. 复制获得的 Token
-
-### 获取管理员 ID
-
-1. 给机器人发送 `/start`
-2. 使用 `@userinfobot` 获取自己的用户 ID
-3. 将 ID 填入 `ADMIN_IDS`
-
-### 获取频道 ID
-
-1. 在频道中发一条消息
-2. 转发给 `@userinfobot`
-3. 获取频道 ID（格式：`-100XXXXXXXXX`）
-
-## 💾 数据库支持
-
-### SQLite（默认，适合小型部署）
-
-```env
-DATABASE_TYPE=sqlite
-SQLITE_DB_PATH=data/bot.db
+# 4. 查看 API 文档
+# 浏览器打开：http://localhost:8000/docs
 ```
 
-### PostgreSQL（推荐用于生产环境）
+## ⚙️ 环境变量
 
-```env
-DATABASE_TYPE=postgresql
-DATABASE_URL=postgresql://user:password@host:5432/database_name
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `BOT_TOKEN` | ✅ | Telegram Bot Token（@BotFather 获取） |
+| `ADMIN_IDS` | ✅ | 管理员 ID 列表（逗号分隔） |
+| `DATABASE_URL` | 推荐 | PostgreSQL 连接 URL |
+| `DATABASE_TYPE` | — | `sqlite`（开发）或 `postgresql`（生产，默认） |
+| `SECRET_KEY` | ✅ | JWT 密钥（生产必须设置强随机值） |
+| `API_KEY` | — | REST API 访问密钥 |
+| `BOT_MODE` | — | `polling`（默认）/ `webhook` / `hybrid` |
+| `WEBHOOK_URL` | webhook模式 | Webhook 公网 URL |
+| `REDIS_URL` | — | Redis 连接 URL（可选，用于缓存） |
+| `CORS_ORIGINS` | — | 允许的 CORS 来源（默认 `*`） |
+| `LOG_LEVEL` | — | 日志级别（默认 `INFO`） |
+
+详见 `.env.example`。
+
+## 🐳 Docker Compose 服务
+
+| 服务 | 说明 | 端口 |
+|------|------|------|
+| `postgres` | PostgreSQL 15 数据库 | 内部 |
+| `redis` | Redis 7 缓存 | 内部 |
+| `bot` | Telegram Bot（轮询/Webhook） | — |
+| `api` | FastAPI REST API | `8000` |
+
+## 📋 验收检查
+
+```bash
+# 健康检查
+curl http://localhost:8000/health
+
+# API 文档
+open http://localhost:8000/docs
+
+# 报告列表（需要先获取 token）
+curl -H "Authorization: Bearer <token>" http://localhost:8000/api/v1/reports/
 ```
 
-### MySQL
+## 🔧 Breaking Changes（相比旧版）
 
-```env
-DATABASE_TYPE=mysql
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=root
-MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=yhq_db
-```
-
-## 🔄 完整工作流程
-
-```
-用户查询 @用户名
-    ↓
-显示统计卡片（推荐数、不推荐数）
-    ├─ 点击【👍推荐】或【👎不推荐】
-    │   ↓
-    │   输入一句话理由
-    │   ↓
-    │   立即保存（系统 A）
-    │
-    ├─ 点击【📝写报告】
-    │   ↓
-    │   逐步填写表单字段
-    │   ↓
-    │   上传预约截图（必填）
-    │   ↓
-    │   输入标签（可选）
-    │   ↓
-    │   预览和提交（系统 B）
-    │   ↓
-    │   管理员审核
-    │   ↓
-    │   通过 → 推送到频道 + 通知用户
-    │
-    └─ 搜索标签 #标签
-        ↓
-        显示匹配的报告列表
-        ↓
-        查看报告详情
-```
-
-## 🔐 安全特性
-
-- 管理员权限验证
-- 频道访问权限检查
-- 用户黑名单系统
-- 数据库操作规范化
-- 错误日志记录
-
-## 📚 依赖包
-
-- `aiogram>=3.0.0` — Telegram Bot 框架
-- `python-dotenv>=1.0.0` — 环境变量管理
-- `aiosqlite>=0.19.0` — SQLite 异步驱动
-- `asyncpg>=0.28.0` — PostgreSQL 异步驱动
-- `aiomysql>=0.2.0` — MySQL 异步驱动
-
-## 📄 License
-
-MIT License
+- ❌ 已移除：快速评价功能（👍/👎 快速推荐）
+- ❌ 已移除：广播系统
+- ❌ 已移除：`@用户名` 快速评价统计卡片（改为显示报告列表）
+- ❌ 已移除：自定义欢迎页面/按钮设置
+- ✅ 新增：REST API（FastAPI）
+- ✅ 新增：PostgreSQL 优先支持
+- ✅ 新增：排行榜改为基于已发布报告数量

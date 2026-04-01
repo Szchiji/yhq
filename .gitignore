@@ -12,6 +12,8 @@ dist/
 
 # Virtual environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -38,7 +40,8 @@ miniapp/node_modules/
 
 # Pytest
 .pytest_cache/
-
+.coverage
+htmlcov/
 
 # OS
 .DS_Store

@@ -7,12 +7,8 @@ from handlers import (
     admin,
     template,
     report_form,
-    quick_rate,
     search,
-    mention,
     mention_report,
-    broadcast,
-    settings,
 )
 
 __all__ = [
@@ -20,10 +16,6 @@ __all__ = [
     "admin",
     "template",
     "report_form",
-    "quick_rate",
     "search",
-    "mention",
     "mention_report",
-    "broadcast",
-    "settings",
 ]
