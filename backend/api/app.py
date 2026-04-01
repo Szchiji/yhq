@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from telegram import Update
 from config import WEBHOOK_DOMAIN, BOT_TOKEN, FRONTEND_URL, API_URL, PORT
 from db import init_db
@@ -38,6 +39,18 @@ async def lifespan(app: FastAPI):
     await bot_app.shutdown()
 
 
+class _SPAStaticFiles(StaticFiles):
+    """StaticFiles subclass that falls back to index.html for SPA routing."""
+
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except (StarletteHTTPException, Exception) as exc:
+            if getattr(exc, "status_code", None) == 404:
+                return await super().get_response("index.html", scope)
+            raise
+
+
 def create_app() -> FastAPI:
     from api.routes import router
 
@@ -63,23 +76,9 @@ def create_app() -> FastAPI:
 
     app.include_router(router, prefix="/api")
 
-    # Serve frontend static files if built dist exists
-    frontend_dist = Path(os.path.dirname(__file__)).parent / "frontend-dist"
-    frontend_dist = frontend_dist.resolve()
+    # Serve frontend SPA — StaticFiles handles path safety internally
+    frontend_dist = (Path(os.path.dirname(__file__)).parent / "frontend-dist").resolve()
     if frontend_dist.is_dir():
-        @app.get("/{full_path:path}")
-        async def serve_spa(full_path: str):
-            # Resolve and validate path stays within frontend_dist (prevents path traversal)
-            try:
-                resolved = (frontend_dist / full_path).resolve()
-                resolved.relative_to(frontend_dist)  # raises ValueError if outside
-            except (ValueError, OSError):
-                resolved = frontend_dist
-            if full_path and resolved.is_file():
-                return FileResponse(str(resolved))
-            index = frontend_dist / "index.html"
-            if index.is_file():
-                return FileResponse(str(index))
-            raise HTTPException(status_code=404, detail="Not found")
+        app.mount("/", _SPAStaticFiles(directory=str(frontend_dist), html=True), name="frontend")
 
     return app
