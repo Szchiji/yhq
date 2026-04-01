@@ -21,7 +21,7 @@ def create_app():
 
     from api.routes import auth, reports, users, admin, health, miniapp
 
-    _app = FastAPI(
+    fastapi_app = FastAPI(
         title="Report System API",
         description="报告管理系统 REST API",
         version="2.0.0",
@@ -32,7 +32,7 @@ def create_app():
 
     # CORS 中间件
     cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
-    _app.add_middleware(
+    fastapi_app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
         allow_credentials=True,
@@ -41,22 +41,22 @@ def create_app():
     )
 
     # 注册路由
-    _app.include_router(health.router, tags=["健康检查"])
-    _app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
-    _app.include_router(reports.router, prefix="/api/v1/reports", tags=["报告"])
-    _app.include_router(users.router, prefix="/api/v1/users", tags=["用户"])
-    _app.include_router(admin.router, prefix="/api/v1/admin", tags=["管理"])
-    _app.include_router(miniapp.router, prefix="/miniapp", tags=["miniapp"])
+    fastapi_app.include_router(health.router, tags=["健康检查"])
+    fastapi_app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
+    fastapi_app.include_router(reports.router, prefix="/api/v1/reports", tags=["报告"])
+    fastapi_app.include_router(users.router, prefix="/api/v1/users", tags=["用户"])
+    fastapi_app.include_router(admin.router, prefix="/api/v1/admin", tags=["管理"])
+    fastapi_app.include_router(miniapp.router, prefix="/miniapp", tags=["miniapp"])
 
-    @_app.on_event("startup")
+    @fastapi_app.on_event("startup")
     async def startup_event():
         logger.info("API 服务已启动")
 
-    @_app.on_event("shutdown")
+    @fastapi_app.on_event("shutdown")
     async def shutdown_event():
         logger.info("API 服务已关闭")
 
-    return _app
+    return fastapi_app
 
 
 # 模块级 app 实例，供 uvicorn 直接使用
