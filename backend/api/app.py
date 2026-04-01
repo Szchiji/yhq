@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,19 +64,22 @@ def create_app() -> FastAPI:
     app.include_router(router, prefix="/api")
 
     # Serve frontend static files if built dist exists
-    frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend-dist"))
-    if os.path.isdir(frontend_dist):
+    frontend_dist = Path(os.path.dirname(__file__)).parent / "frontend-dist"
+    frontend_dist = frontend_dist.resolve()
+    if frontend_dist.is_dir():
         @app.get("/{full_path:path}")
         async def serve_spa(full_path: str):
-            # Resolve and validate path stays within frontend_dist
-            safe_path = os.path.normpath(os.path.join(frontend_dist, full_path))
-            if not safe_path.startswith(frontend_dist + os.sep) and safe_path != frontend_dist:
-                safe_path = frontend_dist
-            if full_path and os.path.isfile(safe_path):
-                return FileResponse(safe_path)
-            index = os.path.join(frontend_dist, "index.html")
-            if os.path.isfile(index):
-                return FileResponse(index)
+            # Resolve and validate path stays within frontend_dist (prevents path traversal)
+            try:
+                resolved = (frontend_dist / full_path).resolve()
+                resolved.relative_to(frontend_dist)  # raises ValueError if outside
+            except (ValueError, OSError):
+                resolved = frontend_dist
+            if full_path and resolved.is_file():
+                return FileResponse(str(resolved))
+            index = frontend_dist / "index.html"
+            if index.is_file():
+                return FileResponse(str(index))
             raise HTTPException(status_code=404, detail="Not found")
 
     return app
