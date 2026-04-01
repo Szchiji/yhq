@@ -12,32 +12,38 @@ services:
       - PORT=3000
       - BOT_TOKEN=${BOT_TOKEN}
       - ADMIN_ID=${ADMIN_ID}
-      - MONGODB_URI=mongodb://mongo:27017/telegram-report-bot
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/telegram_report_bot
       - API_URL=${API_URL:-http://localhost:3000}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - JWT_SECRET=${JWT_SECRET}
       - WEBHOOK_DOMAIN=${WEBHOOK_DOMAIN:-}
     depends_on:
-      - mongo
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  mongo:
-    image: mongo:7
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: telegram_report_bot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "27017:27017"
+      - "5432:5432"
     volumes:
-      - mongo_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  mongo_data:
+  postgres_data:
+
