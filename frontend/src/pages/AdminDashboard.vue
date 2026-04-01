@@ -302,8 +302,6 @@ onMounted(async () => {
   try {
     if (authStore.isAuthenticated && authStore.isAdmin) {
       await loadConfig()
-    }
-    if (authStore.isAuthenticated && authStore.isAdmin) {
       await loadReports()
     }
   } finally {

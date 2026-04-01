@@ -1,5 +1,6 @@
 const Report = require('../../models/Report');
 const { getAdminConfig } = require('../keyboards');
+const { escapeRegex } = require('../../utils/sanitize');
 
 /**
  * Handle query_report keyboard action
@@ -18,7 +19,7 @@ async function handleQueryReport(ctx) {
  * Search reports by username (@mention)
  */
 async function searchByUsername(ctx, username) {
-  const cleanUsername = username.replace(/^@/, '').toLowerCase();
+  const cleanUsername = escapeRegex(username.replace(/^@/, '').slice(0, 64));
 
   const reports = await Report.find({
     username: { $regex: new RegExp(`^${cleanUsername}$`, 'i') },
@@ -39,7 +40,7 @@ async function searchByUsername(ctx, username) {
  * Search reports by tag (#tag)
  */
 async function searchByTag(ctx, tag) {
-  const cleanTag = tag.replace(/^#/, '').toLowerCase();
+  const cleanTag = escapeRegex(tag.replace(/^#/, '').slice(0, 64));
 
   const reports = await Report.find({
     tags: { $regex: new RegExp(cleanTag, 'i') },

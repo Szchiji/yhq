@@ -1,13 +1,15 @@
 const Report = require('../../models/Report');
 const Admin = require('../../models/Admin');
 const config = require('../../config');
+const { escapeRegex, sanitizeMongoQuery } = require('../../utils/sanitize');
 
 /**
  * Submit a new report (from Mini App)
  */
 async function submitReport(req, res) {
   try {
-    const { userId, username, firstName, title, description, content, tags } = req.body;
+    const body = sanitizeMongoQuery(req.body);
+    const { userId, username, firstName, title, description, content, tags } = body;
     const report = new Report({
       userId,
       username: username || '',
@@ -64,13 +66,16 @@ async function submitReport(req, res) {
 async function getReports(req, res) {
   try {
     const { status, page = 1, limit = 20 } = req.query;
-    const query = status ? { status } : {};
+    const validStatuses = ['pending', 'approved', 'rejected'];
+    const query = (status && validStatuses.includes(status)) ? { status } : {};
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
     const reports = await Report.find(query)
       .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
     const total = await Report.countDocuments(query);
-    res.json({ success: true, data: reports, total, page: parseInt(page), limit: parseInt(limit) });
+    res.json({ success: true, data: reports, total, page: pageNum, limit: limitNum });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -151,18 +156,24 @@ async function reviewReport(req, res) {
 async function searchReports(req, res) {
   try {
     const { q, type } = req.query;
-    if (!q) return res.json({ success: true, data: [] });
+    if (!q || typeof q !== 'string') return res.json({ success: true, data: [] });
+
+    // Limit query length to prevent abuse
+    const safeQ = q.slice(0, 100);
+    const safeUsername = escapeRegex(safeQ.replace(/^@/, ''));
+    const safeTag = escapeRegex(safeQ.replace(/^#/, ''));
+    const safeText = escapeRegex(safeQ);
 
     let query = { status: 'approved' };
     if (type === 'username') {
-      query.username = { $regex: new RegExp(q.replace(/^@/, ''), 'i') };
+      query.username = { $regex: new RegExp(safeUsername, 'i') };
     } else if (type === 'tag') {
-      query.tags = { $regex: new RegExp(q.replace(/^#/, ''), 'i') };
+      query.tags = { $regex: new RegExp(safeTag, 'i') };
     } else {
       query.$or = [
-        { username: { $regex: new RegExp(q.replace(/^@/, ''), 'i') } },
-        { tags: { $regex: new RegExp(q.replace(/^#/, ''), 'i') } },
-        { title: { $regex: new RegExp(q, 'i') } },
+        { username: { $regex: new RegExp(safeUsername, 'i') } },
+        { tags: { $regex: new RegExp(safeTag, 'i') } },
+        { title: { $regex: new RegExp(safeText, 'i') } },
       ];
     }
 

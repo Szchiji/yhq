@@ -1,5 +1,6 @@
 const Admin = require('../../models/Admin');
 const config = require('../../config');
+const { sanitizeMongoQuery } = require('../../utils/sanitize');
 
 /**
  * Get admin configuration
@@ -22,7 +23,7 @@ async function getConfig(req, res) {
  */
 async function updateConfig(req, res) {
   try {
-    const updates = req.body;
+    const updates = sanitizeMongoQuery(req.body);
     const admin = await Admin.findOneAndUpdate(
       { adminId: config.ADMIN_ID },
       { $set: updates },

@@ -60,11 +60,6 @@ function createBot() {
           return ctx.reply(`你点击了：${text}`);
       }
     }
-
-    // Default: try search
-    if (text.startsWith('@') || text.startsWith('#')) {
-      return handleSearchMessage(ctx);
-    }
   });
 
   // Error handler
