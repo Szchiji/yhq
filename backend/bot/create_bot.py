@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -35,7 +35,7 @@ async def _approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             await query.answer("报告不存在")
             return
         report.status = "approved"
-        report.reviewed_at = datetime.utcnow()
+        report.reviewed_at = datetime.now(timezone.utc)
         report.reviewed_by = ADMIN_ID
         await db.commit()
         await db.refresh(report)
@@ -83,7 +83,7 @@ async def _reject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await query.answer("报告不存在")
             return
         report.status = "rejected"
-        report.reviewed_at = datetime.utcnow()
+        report.reviewed_at = datetime.now(timezone.utc)
         report.reviewed_by = ADMIN_ID
         await db.commit()
         await db.refresh(report)

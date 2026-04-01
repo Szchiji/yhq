@@ -67,9 +67,12 @@ def create_app() -> FastAPI:
     if os.path.isdir(frontend_dist):
         @app.get("/{full_path:path}")
         async def serve_spa(full_path: str):
-            file_path = os.path.join(frontend_dist, full_path)
-            if full_path and os.path.isfile(file_path):
-                return FileResponse(file_path)
+            # Resolve and validate path stays within frontend_dist
+            safe_path = os.path.normpath(os.path.join(frontend_dist, full_path))
+            if not safe_path.startswith(frontend_dist + os.sep) and safe_path != frontend_dist:
+                safe_path = frontend_dist
+            if full_path and os.path.isfile(safe_path):
+                return FileResponse(safe_path)
             index = os.path.join(frontend_dist, "index.html")
             if os.path.isfile(index):
                 return FileResponse(index)

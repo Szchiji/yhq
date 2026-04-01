@@ -29,4 +29,5 @@ async def telegram_auth(request: Request) -> JSONResponse:
             },
         })
     except Exception as e:
-        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+        print(f"Error in {__name__}: {e}")
+        return JSONResponse({"success": False, "message": "内部错误，请稍后重试"}, status_code=500)

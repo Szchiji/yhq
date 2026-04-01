@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,7 +70,8 @@ async def submit_report(request: Request, db: AsyncSession) -> JSONResponse:
 
         return JSONResponse({"success": True, "data": report.to_dict()})
     except Exception as e:
-        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+        print(f"Error in {__name__}: {e}")
+        return JSONResponse({"success": False, "message": "内部错误，请稍后重试"}, status_code=500)
 
 
 async def get_reports(request: Request, db: AsyncSession) -> JSONResponse:
@@ -100,7 +101,8 @@ async def get_reports(request: Request, db: AsyncSession) -> JSONResponse:
             "limit": limit,
         })
     except Exception as e:
-        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+        print(f"Error in {__name__}: {e}")
+        return JSONResponse({"success": False, "message": "内部错误，请稍后重试"}, status_code=500)
 
 
 async def review_report(request: Request, report_id: str, db: AsyncSession) -> JSONResponse:
@@ -119,7 +121,7 @@ async def review_report(request: Request, report_id: str, db: AsyncSession) -> J
 
         report.status = status
         report.review_note = review_note
-        report.reviewed_at = datetime.utcnow()
+        report.reviewed_at = datetime.now(timezone.utc)
         report.reviewed_by = ADMIN_ID
         await db.commit()
         await db.refresh(report)
@@ -166,7 +168,8 @@ async def review_report(request: Request, report_id: str, db: AsyncSession) -> J
 
         return JSONResponse({"success": True, "data": report.to_dict()})
     except Exception as e:
-        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+        print(f"Error in {__name__}: {e}")
+        return JSONResponse({"success": False, "message": "内部错误，请稍后重试"}, status_code=500)
 
 
 async def search_reports(request: Request, db: AsyncSession) -> JSONResponse:
@@ -200,4 +203,5 @@ async def search_reports(request: Request, db: AsyncSession) -> JSONResponse:
         reports = result.scalars().all()
         return JSONResponse({"success": True, "data": [r.to_dict() for r in reports]})
     except Exception as e:
-        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+        print(f"Error in {__name__}: {e}")
+        return JSONResponse({"success": False, "message": "内部错误，请稍后重试"}, status_code=500)
