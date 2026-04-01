@@ -169,7 +169,10 @@ def create_bot_app() -> Application:
     app.add_handler(CommandHandler("start", _start_command))
     app.add_handler(CommandHandler("admin", _admin_command))
     app.add_handler(CallbackQueryHandler(_check_subscription_callback, pattern="^check_subscription$"))
-    app.add_handler(CallbackQueryHandler(lambda u, c: u.callback_query.answer(), pattern="^noop$"))
+    async def _noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        await update.callback_query.answer()
+
+    app.add_handler(CallbackQueryHandler(_noop_callback, pattern="^noop$"))
     app.add_handler(CallbackQueryHandler(_approve_callback, pattern=r"^approve_(.+)$"))
     app.add_handler(CallbackQueryHandler(_reject_callback, pattern=r"^reject_(.+)$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _text_handler))

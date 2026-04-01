@@ -4,7 +4,8 @@ import json
 from urllib.parse import parse_qsl
 from typing import Optional
 
-from jose import jwt, JWTError
+import jwt
+from jwt.exceptions import PyJWTError
 from fastapi import Request
 from config import BOT_TOKEN, JWT_SECRET, ADMIN_ID
 
@@ -42,7 +43,7 @@ def generate_token(payload: dict) -> str:
 def verify_token(token: str) -> Optional[dict]:
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-    except JWTError:
+    except PyJWTError:
         return None
 
 
