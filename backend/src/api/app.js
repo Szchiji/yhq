@@ -28,6 +28,9 @@ function createApp(bot) {
   // Store bot instance for use in controllers
   app.set('bot', bot);
 
+  // Trust reverse proxy (e.g. Railway) so express-rate-limit can read real client IPs
+  app.set('trust proxy', 1);
+
   // CORS: restrict to configured origins
   const allowedOrigins = [
     config.FRONTEND_URL,

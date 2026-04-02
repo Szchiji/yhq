@@ -71,6 +71,10 @@ async function handleAdminPanel(ctx) {
   const frontendUrl = config.FRONTEND_URL || config.API_URL;
   const adminUrl = `${frontendUrl}/admin`;
 
+  if (!config.isValidPublicUrl(adminUrl)) {
+    return ctx.reply('🔧 *管理员后台*\n\n后台地址未配置，请联系系统管理员设置 FRONTEND_URL 环境变量。', { parse_mode: 'Markdown' });
+  }
+
   const { Markup } = require('telegraf');
   await ctx.reply(
     '🔧 *管理员后台*\n\n点击下方按钮进入管理配置界面：',
