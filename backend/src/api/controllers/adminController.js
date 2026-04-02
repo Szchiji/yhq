@@ -6,11 +6,10 @@ const config = require('../../config');
  */
 async function getConfig(req, res) {
   try {
-    let admin = await Admin.findOne({ adminId: config.ADMIN_ID });
-    if (!admin) {
-      admin = new Admin({ adminId: config.ADMIN_ID });
-      await admin.save();
-    }
+    let [admin] = await Admin.findOrCreate({
+      where: { adminId: config.ADMIN_ID },
+      defaults: { adminId: config.ADMIN_ID },
+    });
     res.json({ success: true, data: admin });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -19,7 +18,7 @@ async function getConfig(req, res) {
 
 /**
  * Update admin configuration
- * Only explicitly allowed fields are updated to prevent NoSQL injection.
+ * Only explicitly allowed fields are updated to prevent injection.
  */
 async function updateConfig(req, res) {
   try {
@@ -67,12 +66,10 @@ async function updateConfig(req, res) {
       };
     }
 
-    const admin = await Admin.findOneAndUpdate(
-      { adminId: config.ADMIN_ID },
-      { $set: safeUpdates },
-      { upsert: true, new: true, runValidators: true }
-    );
-    res.json({ success: true, data: admin });
+    const [admin] = await Admin.upsert({ adminId: config.ADMIN_ID, ...safeUpdates });
+    // Fetch the record to ensure the response reflects all current values
+    const updatedAdmin = await Admin.findByPk(config.ADMIN_ID);
+    res.json({ success: true, data: updatedAdmin });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

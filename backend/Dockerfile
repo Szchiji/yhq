@@ -6,14 +6,14 @@ RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
-# Stage 2: Python backend
-FROM python:3.11-slim
+# Stage 2: Node.js backend
+FROM node:18-alpine
 WORKDIR /app
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/package*.json ./
+RUN npm ci --omit=dev
 COPY backend/ .
-COPY --from=frontend-build /app/backend/frontend-dist ./frontend-dist
+COPY --from=frontend-build /app/frontend/dist ./frontend-dist
 
 EXPOSE 3000
 
-CMD ["python", "main.py"]
+CMD ["node", "src/index.js"]
