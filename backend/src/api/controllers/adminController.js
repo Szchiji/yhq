@@ -67,7 +67,9 @@ async function updateConfig(req, res) {
     }
 
     const [admin] = await Admin.upsert({ adminId: config.ADMIN_ID, ...safeUpdates });
-    res.json({ success: true, data: admin });
+    // Fetch the record to ensure the response reflects all current values
+    const updatedAdmin = await Admin.findByPk(config.ADMIN_ID);
+    res.json({ success: true, data: updatedAdmin });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

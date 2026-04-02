@@ -50,13 +50,6 @@ const Admin = sequelize.define('Admin', {
 }, {
   timestamps: true,
   tableName: 'admins',
-  hooks: {
-    beforeCreate: (admin) => {
-      if (!admin.keyboards || admin.keyboards.length === 0) {
-        admin.keyboards = DEFAULT_KEYBOARDS;
-      }
-    },
-  },
 });
 
 module.exports = Admin;

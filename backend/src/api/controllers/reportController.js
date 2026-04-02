@@ -178,12 +178,10 @@ async function searchReports(req, res) {
     } else if (type === 'tag') {
       where = {
         status: 'approved',
-        [Op.and]: [
-          sequelize.where(
-            sequelize.fn('array_to_string', sequelize.col('tags'), ','),
-            { [Op.iLike]: `%${safeTag}%` }
-          ),
-        ],
+        [Op.and]: sequelize.where(
+          sequelize.fn('array_to_string', sequelize.col('tags'), ','),
+          { [Op.iLike]: `%${safeTag}%` }
+        ),
       };
     } else {
       where = {

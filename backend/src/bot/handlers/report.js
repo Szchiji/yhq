@@ -49,12 +49,10 @@ async function searchByTag(ctx, tag) {
   const reports = await Report.findAll({
     where: {
       status: 'approved',
-      [Op.and]: [
-        sequelize.where(
-          sequelize.fn('array_to_string', sequelize.col('tags'), ','),
-          { [Op.iLike]: `%${cleanTag}%` }
-        ),
-      ],
+      [Op.and]: sequelize.where(
+        sequelize.fn('array_to_string', sequelize.col('tags'), ','),
+        { [Op.iLike]: `%${cleanTag}%` }
+      ),
     },
     order: [['createdAt', 'DESC']],
     limit: 10,
