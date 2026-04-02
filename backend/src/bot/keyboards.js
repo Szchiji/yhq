@@ -6,11 +6,10 @@ const config = require('../config');
  * Get current admin config (creates default if none exists)
  */
 async function getAdminConfig() {
-  let admin = await Admin.findOne({ adminId: config.ADMIN_ID });
-  if (!admin) {
-    admin = new Admin({ adminId: config.ADMIN_ID });
-    await admin.save();
-  }
+  const [admin] = await Admin.findOrCreate({
+    where: { adminId: config.ADMIN_ID },
+    defaults: { adminId: config.ADMIN_ID },
+  });
   return admin;
 }
 

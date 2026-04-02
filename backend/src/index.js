@@ -1,11 +1,11 @@
 require('dotenv').config();
-const connectDB = require('./db');
+const { connectDB } = require('./db');
 const createBot = require('./bot');
 const createApp = require('./api/app');
 const config = require('./config');
 
 async function main() {
-  // Connect to MongoDB
+  // Connect to PostgreSQL
   await connectDB();
 
   // Create bot
@@ -16,14 +16,11 @@ async function main() {
     const reportId = ctx.match[1];
     const Report = require('./models/Report');
     const Admin = require('./models/Admin');
-    const report = await Report.findByIdAndUpdate(
-      reportId,
-      { status: 'approved', reviewedAt: new Date(), reviewedBy: config.ADMIN_ID },
-      { new: true }
-    );
+    const report = await Report.findByPk(reportId);
     if (!report) return ctx.answerCbQuery('报告不存在');
+    await report.update({ status: 'approved', reviewedAt: new Date(), reviewedBy: config.ADMIN_ID });
 
-    const adminConfig = await Admin.findOne({ adminId: config.ADMIN_ID });
+    const adminConfig = await Admin.findOne({ where: { adminId: config.ADMIN_ID } });
 
     // Push to channel
     if (adminConfig?.pushChannelId) {
@@ -44,7 +41,7 @@ async function main() {
 
     // Notify user
     const approvedMsg = adminConfig?.reviewFeedback?.approved || '✅ 你的报告已通过审核，已推送到频道。';
-    await ctx.telegram.sendMessage(report.userId, approvedMsg).catch(() => {});
+    await ctx.telegram.sendMessage(String(report.userId), approvedMsg).catch(() => {});
 
     await ctx.answerCbQuery('✅ 已通过审核');
     await ctx.editMessageText(ctx.callbackQuery.message.text + '\n\n✅ 已审核通过', { parse_mode: 'Markdown' }).catch(() => {});
@@ -54,16 +51,13 @@ async function main() {
     const reportId = ctx.match[1];
     const Report = require('./models/Report');
     const Admin = require('./models/Admin');
-    const report = await Report.findByIdAndUpdate(
-      reportId,
-      { status: 'rejected', reviewedAt: new Date(), reviewedBy: config.ADMIN_ID },
-      { new: true }
-    );
+    const report = await Report.findByPk(reportId);
     if (!report) return ctx.answerCbQuery('报告不存在');
+    await report.update({ status: 'rejected', reviewedAt: new Date(), reviewedBy: config.ADMIN_ID });
 
-    const adminConfig = await Admin.findOne({ adminId: config.ADMIN_ID });
+    const adminConfig = await Admin.findOne({ where: { adminId: config.ADMIN_ID } });
     const rejectedMsg = adminConfig?.reviewFeedback?.rejected || '❌ 你的报告未通过审核，请修改后重新提交。';
-    await ctx.telegram.sendMessage(report.userId, rejectedMsg).catch(() => {});
+    await ctx.telegram.sendMessage(String(report.userId), rejectedMsg).catch(() => {});
 
     await ctx.answerCbQuery('❌ 已拒绝');
     await ctx.editMessageText(ctx.callbackQuery.message.text + '\n\n❌ 已拒绝', { parse_mode: 'Markdown' }).catch(() => {});

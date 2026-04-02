@@ -5,16 +5,12 @@ const { getAdminConfig, buildSubscribeKeyboard } = require('./keyboards');
  * Save or update user record in DB
  */
 async function upsertUser(telegramUser) {
-  await User.findOneAndUpdate(
-    { userId: telegramUser.id },
-    {
-      userId: telegramUser.id,
-      username: telegramUser.username || '',
-      firstName: telegramUser.first_name || '',
-      lastName: telegramUser.last_name || '',
-    },
-    { upsert: true, new: true }
-  );
+  await User.upsert({
+    userId: telegramUser.id,
+    username: telegramUser.username || '',
+    firstName: telegramUser.first_name || '',
+    lastName: telegramUser.last_name || '',
+  });
 }
 
 /**

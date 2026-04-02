@@ -1,16 +1,17 @@
+const { Op } = require('sequelize');
+const { sequelize } = require('../../db');
 const Report = require('../../models/Report');
 const Admin = require('../../models/Admin');
 const config = require('../../config');
-const { escapeRegex, sanitizeMongoQuery } = require('../../utils/sanitize');
+const { escapeLike } = require('../../utils/sanitize');
 
 /**
  * Submit a new report (from Mini App)
  */
 async function submitReport(req, res) {
   try {
-    const body = sanitizeMongoQuery(req.body);
-    const { userId, username, firstName, title, description, content, tags } = body;
-    const report = new Report({
+    const { userId, username, firstName, title, description, content, tags } = req.body;
+    const report = await Report.create({
       userId,
       username: username || '',
       firstName: firstName || '',
@@ -19,7 +20,6 @@ async function submitReport(req, res) {
       content: content || {},
       tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
     });
-    await report.save();
 
     // Notify admin
     const bot = req.app.get('bot');
@@ -38,8 +38,8 @@ async function submitReport(req, res) {
           reply_markup: {
             inline_keyboard: [
               [
-                { text: '✅ 通过', callback_data: `approve_${report._id}` },
-                { text: '❌ 拒绝', callback_data: `reject_${report._id}` },
+                { text: '✅ 通过', callback_data: `approve_${report.id}` },
+                { text: '❌ 拒绝', callback_data: `reject_${report.id}` },
               ],
             ],
           },
@@ -48,10 +48,10 @@ async function submitReport(req, res) {
     }
 
     // Notify user: pending
-    const admin = await Admin.findOne({ adminId: config.ADMIN_ID });
+    const admin = await Admin.findOne({ where: { adminId: config.ADMIN_ID } });
     const pendingMsg = admin?.reviewFeedback?.pending || '⏳ 你的报告已提交，等待管理员审核。';
     if (bot && userId) {
-      await bot.telegram.sendMessage(userId, pendingMsg).catch(() => {});
+      await bot.telegram.sendMessage(String(userId), pendingMsg).catch(() => {});
     }
 
     res.json({ success: true, data: report });
@@ -67,14 +67,16 @@ async function getReports(req, res) {
   try {
     const { status, page = 1, limit = 20 } = req.query;
     const validStatuses = ['pending', 'approved', 'rejected'];
-    const query = (status && validStatuses.includes(status)) ? { status } : {};
+    const where = (status && validStatuses.includes(status)) ? { status } : {};
     const pageNum = Math.max(1, parseInt(page) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
-    const reports = await Report.find(query)
-      .sort({ createdAt: -1 })
-      .skip((pageNum - 1) * limitNum)
-      .limit(limitNum);
-    const total = await Report.countDocuments(query);
+    const reports = await Report.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      offset: (pageNum - 1) * limitNum,
+      limit: limitNum,
+    });
+    const total = await Report.count({ where });
     res.json({ success: true, data: reports, total, page: pageNum, limit: limitNum });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -93,30 +95,27 @@ async function reviewReport(req, res) {
       return res.status(400).json({ success: false, message: '无效状态' });
     }
 
-    // Validate that id is a valid MongoDB ObjectId format
-    if (!/^[a-f\d]{24}$/i.test(id)) {
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
       return res.status(400).json({ success: false, message: '无效的报告 ID' });
     }
 
     const safeReviewNote = typeof reviewNote === 'string' ? reviewNote.slice(0, 500) : '';
 
-    const report = await Report.findByIdAndUpdate(
-      id,
-      {
-        status,
-        reviewNote: safeReviewNote,
-        reviewedAt: new Date(),
-        reviewedBy: config.ADMIN_ID,
-      },
-      { new: true }
-    );
-
+    const report = await Report.findByPk(id);
     if (!report) {
       return res.status(404).json({ success: false, message: '报告不存在' });
     }
+    await report.update({
+      status,
+      reviewNote: safeReviewNote,
+      reviewedAt: new Date(),
+      reviewedBy: config.ADMIN_ID,
+    });
 
     const bot = req.app.get('bot');
-    const adminConfig = await Admin.findOne({ adminId: config.ADMIN_ID });
+    const adminConfig = await Admin.findOne({ where: { adminId: config.ADMIN_ID } });
 
     if (status === 'approved') {
       // Push to channel
@@ -131,8 +130,7 @@ async function reviewReport(req, res) {
             (report.tags.length > 0 ? `🏷 ${report.tags.map((t) => `#${t}`).join(' ')}` : ''),
             { parse_mode: 'Markdown' }
           );
-          report.channelMessageId = channelMsg.message_id;
-          await report.save();
+          await report.update({ channelMessageId: channelMsg.message_id });
         } catch (e) {
           console.error('Failed to push to channel:', e.message);
         }
@@ -140,14 +138,14 @@ async function reviewReport(req, res) {
       // Notify user
       const approvedMsg = adminConfig?.reviewFeedback?.approved || '✅ 你的报告已通过审核，已推送到频道。';
       if (bot && report.userId) {
-        await bot.telegram.sendMessage(report.userId, approvedMsg).catch(() => {});
+        await bot.telegram.sendMessage(String(report.userId), approvedMsg).catch(() => {});
       }
     } else {
       // Notify user of rejection
       const rejectedMsg = (adminConfig?.reviewFeedback?.rejected || '❌ 你的报告未通过审核，请修改后重新提交。') +
         (reviewNote ? `\n\n管理员备注：${reviewNote}` : '');
       if (bot && report.userId) {
-        await bot.telegram.sendMessage(report.userId, rejectedMsg).catch(() => {});
+        await bot.telegram.sendMessage(String(report.userId), rejectedMsg).catch(() => {});
       }
     }
 
@@ -167,24 +165,45 @@ async function searchReports(req, res) {
 
     // Limit query length to prevent abuse
     const safeQ = q.slice(0, 100);
-    const safeUsername = escapeRegex(safeQ.replace(/^@/, ''));
-    const safeTag = escapeRegex(safeQ.replace(/^#/, ''));
-    const safeText = escapeRegex(safeQ);
+    const safeUsername = escapeLike(safeQ.replace(/^@/, ''));
+    const safeTag = escapeLike(safeQ.replace(/^#/, ''));
+    const safeText = escapeLike(safeQ);
 
-    let query = { status: 'approved' };
+    let where;
     if (type === 'username') {
-      query.username = { $regex: new RegExp(safeUsername, 'i') };
+      where = {
+        status: 'approved',
+        username: { [Op.iLike]: `%${safeUsername}%` },
+      };
     } else if (type === 'tag') {
-      query.tags = { $regex: new RegExp(safeTag, 'i') };
+      where = {
+        status: 'approved',
+        [Op.and]: [
+          sequelize.where(
+            sequelize.fn('array_to_string', sequelize.col('tags'), ','),
+            { [Op.iLike]: `%${safeTag}%` }
+          ),
+        ],
+      };
     } else {
-      query.$or = [
-        { username: { $regex: new RegExp(safeUsername, 'i') } },
-        { tags: { $regex: new RegExp(safeTag, 'i') } },
-        { title: { $regex: new RegExp(safeText, 'i') } },
-      ];
+      where = {
+        status: 'approved',
+        [Op.or]: [
+          { username: { [Op.iLike]: `%${safeUsername}%` } },
+          sequelize.where(
+            sequelize.fn('array_to_string', sequelize.col('tags'), ','),
+            { [Op.iLike]: `%${safeTag}%` }
+          ),
+          { title: { [Op.iLike]: `%${safeText}%` } },
+        ],
+      };
     }
 
-    const reports = await Report.find(query).sort({ createdAt: -1 }).limit(20);
+    const reports = await Report.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit: 20,
+    });
     res.json({ success: true, data: reports });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

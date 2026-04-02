@@ -1,38 +1,76 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../db');
 
-const ReportSchema = new mongoose.Schema({
-  userId: { type: Number, required: true },
-  username: { type: String, default: '' },
-  firstName: { type: String, default: '' },
-  content: { type: mongoose.Schema.Types.Mixed, default: {} },
-  title: { type: String, default: '' },
-  description: { type: String, default: '' },
-  tags: [{ type: String }],
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending',
+const Report = sequelize.define('Report', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
   },
-  reviewedAt: { type: Date },
-  reviewedBy: { type: Number },
-  reviewNote: { type: String, default: '' },
-  channelMessageId: { type: Number },
-  reportNumber: { type: Number, unique: true },
-}, { timestamps: true });
-
-// Auto-increment reportNumber
-ReportSchema.pre('save', async function (next) {
-  if (this.isNew) {
-    const lastReport = await this.constructor.findOne({}, {}, { sort: { reportNumber: -1 } });
-    this.reportNumber = lastReport ? lastReport.reportNumber + 1 : 1;
-  }
-  next();
+  reportNumber: {
+    type: DataTypes.INTEGER,
+    unique: true,
+  },
+  userId: {
+    type: DataTypes.BIGINT,
+    allowNull: false,
+  },
+  username: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  firstName: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  content: {
+    type: DataTypes.JSONB,
+    defaultValue: {},
+  },
+  title: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  description: {
+    type: DataTypes.TEXT,
+    defaultValue: '',
+  },
+  tags: {
+    type: DataTypes.ARRAY(DataTypes.STRING),
+    defaultValue: [],
+  },
+  status: {
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    defaultValue: 'pending',
+  },
+  reviewedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  reviewedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+  },
+  reviewNote: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  channelMessageId: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+  },
+}, {
+  timestamps: true,
+  tableName: 'reports',
+  hooks: {
+    beforeCreate: async (report) => {
+      const maxReport = await Report.findOne({
+        attributes: ['reportNumber'],
+        order: [['reportNumber', 'DESC']],
+      });
+      report.reportNumber = maxReport ? (maxReport.reportNumber || 0) + 1 : 1;
+    },
+  },
 });
 
-// Text index for search
-ReportSchema.index({ username: 'text', title: 'text', description: 'text', tags: 'text' });
-ReportSchema.index({ tags: 1 });
-ReportSchema.index({ username: 1 });
-ReportSchema.index({ status: 1 });
-
-module.exports = mongoose.model('Report', ReportSchema);
+module.exports = Report;

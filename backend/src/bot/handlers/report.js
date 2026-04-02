@@ -1,6 +1,8 @@
+const { Op } = require('sequelize');
+const { sequelize } = require('../../db');
 const Report = require('../../models/Report');
 const { getAdminConfig } = require('../keyboards');
-const { escapeRegex } = require('../../utils/sanitize');
+const { escapeLike } = require('../../utils/sanitize');
 
 /**
  * Handle query_report keyboard action
@@ -19,14 +21,16 @@ async function handleQueryReport(ctx) {
  * Search reports by username (@mention)
  */
 async function searchByUsername(ctx, username) {
-  const cleanUsername = escapeRegex(username.replace(/^@/, '').slice(0, 64));
+  const cleanUsername = escapeLike(username.replace(/^@/, '').slice(0, 64));
 
-  const reports = await Report.find({
-    username: { $regex: new RegExp(`^${cleanUsername}$`, 'i') },
-    status: 'approved',
-  })
-    .sort({ createdAt: -1 })
-    .limit(10);
+  const reports = await Report.findAll({
+    where: {
+      username: { [Op.iLike]: cleanUsername },
+      status: 'approved',
+    },
+    order: [['createdAt', 'DESC']],
+    limit: 10,
+  });
 
   if (reports.length === 0) {
     return ctx.reply(`📭 未找到用户 @${cleanUsername} 的报告。`);
@@ -40,14 +44,21 @@ async function searchByUsername(ctx, username) {
  * Search reports by tag (#tag)
  */
 async function searchByTag(ctx, tag) {
-  const cleanTag = escapeRegex(tag.replace(/^#/, '').slice(0, 64));
+  const cleanTag = escapeLike(tag.replace(/^#/, '').slice(0, 64));
 
-  const reports = await Report.find({
-    tags: { $regex: new RegExp(cleanTag, 'i') },
-    status: 'approved',
-  })
-    .sort({ createdAt: -1 })
-    .limit(10);
+  const reports = await Report.findAll({
+    where: {
+      status: 'approved',
+      [Op.and]: [
+        sequelize.where(
+          sequelize.fn('array_to_string', sequelize.col('tags'), ','),
+          { [Op.iLike]: `%${cleanTag}%` }
+        ),
+      ],
+    },
+    order: [['createdAt', 'DESC']],
+    limit: 10,
+  });
 
   if (reports.length === 0) {
     return ctx.reply(`📭 未找到标签 #${cleanTag} 的报告。`);
