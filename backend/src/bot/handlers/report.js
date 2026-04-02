@@ -111,6 +111,10 @@ async function handleWriteReport(ctx) {
   const frontendUrl = config.FRONTEND_URL || config.API_URL;
   const reportUrl = `${frontendUrl}/report?userId=${ctx.from.id}`;
 
+  if (!config.isValidPublicUrl(reportUrl)) {
+    return ctx.reply('📝 *填写报告*\n\n报告页面地址未配置，请联系管理员。', { parse_mode: 'Markdown' });
+  }
+
   const { Markup } = require('telegraf');
   await ctx.reply(
     '📝 *填写报告*\n\n点击下方按钮进入报告填写页面：',
