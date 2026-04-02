@@ -3,6 +3,7 @@ const { sequelize } = require('../../db');
 const Report = require('../../models/Report');
 const { getAdminConfig } = require('../keyboards');
 const { escapeLike } = require('../../utils/sanitize');
+const config = require('../../config');
 
 /**
  * Handle query_report keyboard action
@@ -107,7 +108,7 @@ async function handleSearchMessage(ctx) {
  */
 async function handleWriteReport(ctx) {
   const admin = await getAdminConfig();
-  const frontendUrl = process.env.FRONTEND_URL || process.env.API_URL;
+  const frontendUrl = config.FRONTEND_URL || config.API_URL;
   const reportUrl = `${frontendUrl}/report?userId=${ctx.from.id}`;
 
   const { Markup } = require('telegraf');
