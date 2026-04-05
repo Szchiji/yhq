@@ -18,9 +18,17 @@ async function connectDB() {
     require('../models/User');
     require('../models/Report');
     require('../models/Admin');
+    require('../models/ReportDraft');
+
+    // Enable pg_trgm for trigram-based full-text search (best-effort)
+    try {
+      await sequelize.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
+    } catch (e) {
+      console.warn('Could not enable pg_trgm extension (non-fatal):', e.message);
+    }
 
     // Create tables if they don't exist (safe for production)
-    await sequelize.sync();
+    await sequelize.sync({ alter: true });
     console.log('Database tables synchronized');
   } catch (err) {
     console.error('PostgreSQL connection error:', err.message);

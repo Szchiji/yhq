@@ -16,7 +16,11 @@ async function telegramAuth(req, res) {
       return res.status(401).json({ success: false, message: 'initData 验证失败' });
     }
 
-    const isAdmin = user.id === config.ADMIN_ID;
+    // Check against ADMIN_IDS (multi-admin support)
+    const isAdmin = (config.ADMIN_IDS && config.ADMIN_IDS.length > 0)
+      ? config.ADMIN_IDS.includes(user.id)
+      : user.id === config.ADMIN_ID;
+
     const token = generateToken({ userId: user.id, username: user.username, isAdmin });
 
     res.json({

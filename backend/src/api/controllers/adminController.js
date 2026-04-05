@@ -53,13 +53,14 @@ async function updateConfig(req, res) {
       if (typeof rf.approved === 'string') safeUpdates.reviewFeedback.approved = rf.approved.slice(0, 1000);
       if (typeof rf.rejected === 'string') safeUpdates.reviewFeedback.rejected = rf.rejected.slice(0, 1000);
       if (typeof rf.pending === 'string') safeUpdates.reviewFeedback.pending = rf.pending.slice(0, 1000);
+      if (typeof rf.needMoreInfo === 'string') safeUpdates.reviewFeedback.needMoreInfo = rf.needMoreInfo.slice(0, 1000);
     }
     if (body.reportTemplate && Array.isArray(body.reportTemplate.fields)) {
       safeUpdates.reportTemplate = {
         fields: body.reportTemplate.fields.slice(0, 20).map((f) => ({
           name: String(f.name || '').slice(0, 64),
           label: String(f.label || '').slice(0, 128),
-          type: ['text', 'textarea', 'select'].includes(f.type) ? f.type : 'text',
+          type: ['text', 'textarea', 'select', 'media', 'location', 'multiselect'].includes(f.type) ? f.type : 'text',
           required: Boolean(f.required),
           options: Array.isArray(f.options) ? f.options.slice(0, 20).map((o) => String(o).slice(0, 128)) : [],
         })),

@@ -1,5 +1,17 @@
 const User = require('../models/User');
 const { getAdminConfig, buildSubscribeKeyboard } = require('./keyboards');
+const config = require('../config');
+
+/**
+ * Check if a user ID is an admin.
+ */
+function isAdmin(userId) {
+  if (!userId) return false;
+  if (config.ADMIN_IDS && config.ADMIN_IDS.length > 0) {
+    return config.ADMIN_IDS.includes(userId);
+  }
+  return userId === config.ADMIN_ID;
+}
 
 /**
  * Save or update user record in DB
@@ -14,24 +26,43 @@ async function upsertUser(telegramUser) {
 }
 
 /**
- * Check if a user is subscribed to the required channel.
- * Returns true if no channel configured or user is subscribed/admin.
+ * Get the list of required subscription chats.
+ * Priority: REQUIRED_CHATS env var → admin.channelId DB config.
+ */
+async function getRequiredChats() {
+  if (config.REQUIRED_CHATS && config.REQUIRED_CHATS.length > 0) {
+    return config.REQUIRED_CHATS;
+  }
+  const admin = await getAdminConfig();
+  return admin.channelId ? [admin.channelId] : [];
+}
+
+/**
+ * Check if a user is subscribed to ALL required channels/groups.
+ * Returns true if no channels configured or user is an admin.
  */
 async function checkSubscription(ctx, bot) {
-  const admin = await getAdminConfig();
-  if (!admin.channelId) return true;
-
+  if (!ctx.from) return true;
   const userId = ctx.from.id;
-  const config = require('../config');
-  if (userId === config.ADMIN_ID) return true;
 
-  try {
-    const member = await bot.telegram.getChatMember(admin.channelId, userId);
-    const validStatuses = ['member', 'administrator', 'creator'];
-    return validStatuses.includes(member.status);
-  } catch {
-    return false;
+  if (isAdmin(userId)) return true;
+
+  const requiredChats = await getRequiredChats();
+  if (requiredChats.length === 0) return true;
+
+  for (const chatId of requiredChats) {
+    try {
+      const member = await bot.telegram.getChatMember(chatId, userId);
+      const validStatuses = ['member', 'administrator', 'creator'];
+      if (!validStatuses.includes(member.status)) {
+        return false;
+      }
+    } catch {
+      // If we can't check, treat as not subscribed to be safe
+      return false;
+    }
   }
+  return true;
 }
 
 /**
@@ -47,12 +78,12 @@ function subscriptionMiddleware(bot) {
     const isSubscribed = await checkSubscription(ctx, bot);
     if (isSubscribed) return next();
 
-    const admin = await getAdminConfig();
+    const requiredChats = await getRequiredChats();
     await ctx.reply(
-      '⚠️ 请先订阅我们的频道才能使用此机器人！\n\n订阅后点击"我已订阅"按钮继续。',
-      buildSubscribeKeyboard(admin.channelId)
+      '⚠️ 请先订阅我们的频道才能使用此机器人！\n\n订阅后点击"我已加入，重新检测"按钮继续。',
+      buildSubscribeKeyboard(requiredChats)
     );
   };
 }
 
-module.exports = { upsertUser, checkSubscription, subscriptionMiddleware };
+module.exports = { upsertUser, checkSubscription, subscriptionMiddleware, isAdmin, getRequiredChats };

@@ -45,6 +45,7 @@ const Admin = sequelize.define('Admin', {
       approved: '✅ 你的报告已通过审核，已推送到频道。',
       rejected: '❌ 你的报告未通过审核，请修改后重新提交。',
       pending: '⏳ 你的报告已提交，等待管理员审核。',
+      needMoreInfo: '🔎 管理员需要更多信息才能完成审核，请补充材料后重新提交。',
     },
   },
 }, {
