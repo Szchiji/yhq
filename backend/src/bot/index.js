@@ -348,7 +348,10 @@ function createBot() {
     const step = activeDraft.currentStep;
     const field = fields[step];
 
-    if (field.type !== 'media' && field.type !== 'text') return;
+    if (field.type !== 'media' && field.type !== 'text') {
+      await ctx.reply('⚠️ 当前字段"' + field.label + '"不接受此类型的输入，请发送文字内容，或点击"跳过"按钮。');
+      return;
+    }
 
     const newData = Object.assign({}, activeDraft.data);
     if (ctx.message.photo) {

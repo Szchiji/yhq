@@ -4,19 +4,7 @@ const Report = require('../../models/Report');
 const Admin = require('../../models/Admin');
 const config = require('../../config');
 const { escapeLike } = require('../../utils/sanitize');
-
-/**
- * Build a t.me link for a pushed channel message.
- */
-function buildChannelMessageUrl(chatId, messageId) {
-  if (!chatId || !messageId) return null;
-  const str = String(chatId);
-  if (str.startsWith('@')) {
-    return `https://t.me/${str.slice(1)}/${messageId}`;
-  }
-  const numericId = str.replace(/^-100/, '');
-  return `https://t.me/c/${numericId}/${messageId}`;
-}
+const { buildChannelMessageUrl } = require('../../bot/keyboards');
 
 /**
  * Get publish channel list: PUBLISH_CHATS env var > admin DB config.
