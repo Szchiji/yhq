@@ -22,7 +22,11 @@ const authLimiter = rateLimit({
   message: { success: false, message: '认证请求过于频繁，请稍后再试' },
 });
 
-function createApp(bot) {
+/**
+ * @param {import('telegraf').Telegraf} bot
+ * @param {{ webhookPath?: string }} [options]
+ */
+function createApp(bot, options = {}) {
   const app = express();
 
   // Store bot instance for use in controllers
@@ -35,7 +39,7 @@ function createApp(bot) {
   const allowedOrigins = [
     config.FRONTEND_URL,
     config.API_URL,
-    config.WEBHOOK_DOMAIN,
+    config.WEBHOOK_URL,
   ].filter(Boolean);
 
   app.use(cors({
@@ -58,9 +62,8 @@ function createApp(bot) {
   app.use('/api', generalLimiter);
 
   // Telegram webhook endpoint (no rate limit needed - Telegram handles this)
-  if (config.WEBHOOK_DOMAIN && bot) {
-    const webhookPath = `/webhook/${config.BOT_TOKEN}`;
-    app.use(bot.webhookCallback(webhookPath));
+  if (options.webhookPath && bot) {
+    app.use(bot.webhookCallback(options.webhookPath));
   }
 
   // API routes (auth endpoints get stricter limit)
