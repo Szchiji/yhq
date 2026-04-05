@@ -319,8 +319,9 @@ function startPolling() {
         stopCountdown()
         otpStep.value = 'expired'
       }
-    } catch {
-      // ignore poll errors, keep trying
+    } catch (e) {
+      // ignore poll errors (network hiccup, server restart), keep trying
+      if (import.meta.env.DEV) console.debug('[OTP poll error]', e?.message)
     }
   }, 2000)
 }
