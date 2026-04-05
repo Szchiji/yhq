@@ -9,6 +9,24 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.isAdmin || false)
 
+  /**
+   * Set token directly (used by OTP login flow after bot verification).
+   * Decodes the JWT payload to populate the user ref.
+   */
+  function setToken(jwt) {
+    token.value = jwt
+    localStorage.setItem('token', jwt)
+    // Decode payload (no verification needed – server already verified)
+    try {
+      const payload = JSON.parse(atob(jwt.split('.')[1]))
+      user.value = { id: payload.userId, isAdmin: payload.isAdmin }
+      localStorage.setItem('user', JSON.stringify(user.value))
+    } catch {
+      user.value = { isAdmin: true }
+      localStorage.setItem('user', JSON.stringify(user.value))
+    }
+  }
+
   async function loginWithTelegram() {
     const tg = window.Telegram?.WebApp
     if (!tg || !tg.initData) {
@@ -34,5 +52,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user')
   }
 
-  return { token, user, isAuthenticated, isAdmin, loginWithTelegram, logout }
+  return { token, user, isAuthenticated, isAdmin, setToken, loginWithTelegram, logout }
 })

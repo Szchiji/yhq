@@ -1,4 +1,5 @@
 const { Telegraf, session } = require('telegraf');
+const { Op } = require('sequelize');
 const config = require('../config');
 const { subscriptionMiddleware, isAdmin } = require('./middleware');
 const { handleStart, handleCheckSubscription, handleAdminPanel } = require('./handlers/start');
@@ -21,6 +22,7 @@ const { getAdminConfig, buildMainKeyboard, buildChannelMessageUrl } = require('.
 const ReportDraft = require('../models/ReportDraft');
 const Report = require('../models/Report');
 const Admin = require('../models/Admin');
+const AdminLoginOtp = require('../models/AdminLoginOtp');
 
 function createBot() {
   const bot = new Telegraf(config.BOT_TOKEN);
@@ -171,11 +173,27 @@ function createBot() {
   bot.action(/^approve_(.+)$/, async (ctx) => {
     if (!isAdmin(ctx.from.id)) return ctx.answerCbQuery('❌ 无权限');
     const reportId = ctx.match[1];
-    const report = await Report.findByPk(reportId);
-    if (!report) return ctx.answerCbQuery('报告不存在');
 
     const adminConfig = await Admin.findOne({ where: { adminId: config.ADMIN_ID } });
     const fields = await getTemplateFields();
+
+    // Atomic conditional update: only succeeds when report is still 'pending'
+    const [affectedRows] = await Report.update(
+      { status: 'approved', reviewedAt: new Date(), reviewedBy: ctx.from.id },
+      { where: { id: reportId, status: 'pending' } }
+    );
+
+    if (affectedRows === 0) {
+      const report = await Report.findByPk(reportId);
+      if (!report) return ctx.answerCbQuery('报告不存在');
+      if (report.status === 'need_more_info') {
+        return ctx.answerCbQuery('⚠️ 该报告等待用户补充材料，暂不可审核');
+      }
+      const byLabel = report.reviewedBy ? `（由 ${report.reviewedBy} 操作）` : '';
+      return ctx.answerCbQuery(`已由其他管理员处理${byLabel}，无需重复操作`);
+    }
+
+    const report = await Report.findByPk(reportId);
 
     const publishChats = config.PUBLISH_CHATS.length > 0
       ? config.PUBLISH_CHATS
@@ -204,9 +222,6 @@ function createBot() {
     }
 
     await report.update({
-      status: 'approved',
-      reviewedAt: new Date(),
-      reviewedBy: ctx.from.id,
       channelMessages,
       channelMessageId: channelMessages[0] ? channelMessages[0].messageId : null,
     });
@@ -225,11 +240,24 @@ function createBot() {
   bot.action(/^reject_(.+)$/, async (ctx) => {
     if (!isAdmin(ctx.from.id)) return ctx.answerCbQuery('❌ 无权限');
     const reportId = ctx.match[1];
+
+    // Atomic conditional update: only succeeds when report is still 'pending'
+    const [affectedRows] = await Report.update(
+      { status: 'rejected', reviewedAt: new Date(), reviewedBy: ctx.from.id },
+      { where: { id: reportId, status: 'pending' } }
+    );
+
+    if (affectedRows === 0) {
+      const report = await Report.findByPk(reportId);
+      if (!report) return ctx.answerCbQuery('报告不存在');
+      if (report.status === 'need_more_info') {
+        return ctx.answerCbQuery('⚠️ 该报告等待用户补充材料，暂不可审核');
+      }
+      const byLabel = report.reviewedBy ? `（由 ${report.reviewedBy} 操作）` : '';
+      return ctx.answerCbQuery(`已由其他管理员处理${byLabel}，无需重复操作`);
+    }
+
     const report = await Report.findByPk(reportId);
-    if (!report) return ctx.answerCbQuery('报告不存在');
-
-    await report.update({ status: 'rejected', reviewedAt: new Date(), reviewedBy: ctx.from.id });
-
     const adminConfig = await Admin.findOne({ where: { adminId: config.ADMIN_ID } });
     const rejectedMsg = (adminConfig && adminConfig.reviewFeedback && adminConfig.reviewFeedback.rejected)
       || '❌ 你的报告未通过审核，请修改后重新提交。';
@@ -244,11 +272,21 @@ function createBot() {
   bot.action(/^need_info_(.+)$/, async (ctx) => {
     if (!isAdmin(ctx.from.id)) return ctx.answerCbQuery('❌ 无权限');
     const reportId = ctx.match[1];
+
+    // Atomic conditional update: only succeeds when report is still 'pending'
+    const [affectedRows] = await Report.update(
+      { status: 'need_more_info', reviewedAt: new Date(), reviewedBy: ctx.from.id },
+      { where: { id: reportId, status: 'pending' } }
+    );
+
+    if (affectedRows === 0) {
+      const report = await Report.findByPk(reportId);
+      if (!report) return ctx.answerCbQuery('报告不存在');
+      const byLabel = report.reviewedBy ? `（由 ${report.reviewedBy} 操作）` : '';
+      return ctx.answerCbQuery(`已由其他管理员处理${byLabel}，无需重复操作`);
+    }
+
     const report = await Report.findByPk(reportId);
-    if (!report) return ctx.answerCbQuery('报告不存在');
-
-    await report.update({ status: 'need_more_info', reviewedAt: new Date(), reviewedBy: ctx.from.id });
-
     await ctx.answerCbQuery('🔎 请输入补充要求（将发给用户）');
     ctx.session = ctx.session || {};
     ctx.session.pendingNeedMoreInfo = { reportId: report.id, userId: String(report.userId) };
@@ -260,15 +298,85 @@ function createBot() {
     await ctx.editMessageText(originalText + '\n\n🔎 需要补充材料', { parse_mode: 'Markdown' }).catch(() => {});
   });
 
+  // User resubmit: change report from need_more_info back to pending and re-notify admins
+  bot.action(/^resubmit_(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery('⏳ 重新提交中…');
+    const reportId = ctx.match[1];
+
+    const [affectedRows] = await Report.update(
+      { status: 'pending', needMoreInfoNote: '' },
+      { where: { id: reportId, userId: ctx.from.id, status: 'need_more_info' } }
+    );
+
+    if (affectedRows === 0) {
+      return ctx.reply('❌ 重新提交失败，报告不存在或当前状态不允许。');
+    }
+
+    const report = await Report.findByPk(reportId);
+    const fields = report.content
+      ? Object.keys(report.content).map((k) => ({ name: k, label: k }))
+      : await getTemplateFields();
+
+    // Re-notify all admins via private chat only
+    const adminIds = config.ADMIN_IDS.length > 0 ? config.ADMIN_IDS : [config.ADMIN_ID];
+    const inlineKeyboard = [
+      [
+        { text: '✅ 通过', callback_data: 'approve_' + report.id },
+        { text: '❌ 拒绝', callback_data: 'reject_' + report.id },
+        { text: '🔎 补充材料', callback_data: 'need_info_' + report.id },
+      ],
+    ];
+    const preview = buildPreview(report.content || {}, fields);
+    const msg =
+      '📬 *报告重新提交待审核*\n\n' +
+      '报告编号：No.' + report.reportNumber + '\n\n' +
+      preview;
+
+    for (const adminId of adminIds) {
+      await ctx.telegram.sendMessage(String(adminId), msg, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: inlineKeyboard },
+      }).catch((e) => console.error('Failed to notify admin ' + adminId + ':', e.message));
+    }
+
+    await ctx.reply('✅ 已重新提交，管理员将重新审核你的报告。');
+  });
+
   // ── Text message router ────────────────────────────────────────────────────
 
   bot.on('text', async (ctx) => {
     ctx.session = ctx.session || {};
+    const text = ctx.message.text.trim();
+
+    // ── OTP verification (private chat only) ──────────────────────────────
+    if (/^\d{6}$/.test(text)) {
+      if (ctx.chat.type !== 'private') {
+        return ctx.reply('⚠️ 请私聊机器人发送验证码，不要在群里发送。');
+      }
+      if (!isAdmin(ctx.from.id)) {
+        return ctx.reply('❌ 无管理员权限，验证失败。');
+      }
+      // Find a valid, unused OTP with this code
+      const otp = await AdminLoginOtp.findOne({
+        where: {
+          code: text,
+          expiresAt: { [Op.gt]: new Date() },
+          verifiedAt: null,
+          usedAt: null,
+        },
+        order: [['createdAt', 'DESC']],
+      });
+      if (!otp) {
+        return ctx.reply('❌ 验证码无效或已过期，请回到网页重新获取。');
+      }
+      await otp.update({ verifiedAt: new Date(), verifiedBy: ctx.from.id });
+      return ctx.reply('✅ 验证成功！请回到网页，页面将自动跳转到管理后台。');
+    }
 
     // Admin typing supplementary note after clicking "need more info"
     if (ctx.session.pendingNeedMoreInfo && isAdmin(ctx.from.id)) {
       const { reportId, userId } = ctx.session.pendingNeedMoreInfo;
-      const note = ctx.message.text.trim();
+      const note = text;
       delete ctx.session.pendingNeedMoreInfo;
 
       if (note !== '/skip') {
@@ -278,14 +386,20 @@ function createBot() {
           const adminConfig = await Admin.findOne({ where: { adminId: config.ADMIN_ID } });
           const baseMsg = (adminConfig && adminConfig.reviewFeedback && adminConfig.reviewFeedback.needMoreInfo)
             || '🔎 管理员需要更多信息才能完成审核，请补充材料后重新提交。';
-          await ctx.telegram.sendMessage(userId, baseMsg + '\n\n📋 补充要求：' + note).catch(() => {});
+          const { Markup } = require('telegraf');
+          const resubmitBtn = Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 补充完成，重新提交', 'resubmit_' + report.id)],
+          ]);
+          await ctx.telegram.sendMessage(
+            userId,
+            baseMsg + '\n\n📋 补充要求：' + note,
+            resubmitBtn
+          ).catch(() => {});
           return ctx.reply('✅ 已发送补充要求给用户。');
         }
       }
       return ctx.reply('✅ 已跳过补充说明。');
     }
-
-    const text = ctx.message.text.trim();
 
     // Check if user has an active draft in progress
     const activeDraft = await ReportDraft.findByPk(ctx.from.id);

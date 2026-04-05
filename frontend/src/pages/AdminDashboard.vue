@@ -4,13 +4,42 @@
       <p>加载中...</p>
     </div>
 
-    <div v-else-if="!authStore.isAuthenticated" class="card">
-      <h2>🔐 管理员后台</h2>
-      <p style="margin: 12px 0; color: var(--tg-theme-hint-color);">请通过 Telegram 验证登录</p>
-      <button class="btn btn-primary" @click="login" :disabled="authLoading">
-        {{ authLoading ? '验证中...' : '登录' }}
-      </button>
-      <div v-if="authError" class="alert alert-error" style="margin-top: 12px;">{{ authError }}</div>
+    <!-- OTP login panel -->
+    <div v-else-if="!authStore.isAuthenticated" class="card otp-card">
+      <h2>🔐 管理员后台登录</h2>
+
+      <!-- Step 1: request OTP -->
+      <div v-if="otpStep === 'request'">
+        <p class="hint">点击下方按钮获取 6 位验证码，然后将验证码私聊发送给机器人。</p>
+        <button class="btn btn-primary" @click="requestOtp" :disabled="otpLoading">
+          {{ otpLoading ? '生成中...' : '获取验证码' }}
+        </button>
+        <div v-if="authError" class="alert alert-error" style="margin-top: 12px;">{{ authError }}</div>
+      </div>
+
+      <!-- Step 2: show code + poll -->
+      <div v-else-if="otpStep === 'pending'">
+        <p class="hint">请将以下 6 位验证码私聊发送给机器人（有效期 5 分钟）：</p>
+        <div class="otp-code">{{ otpCode }}</div>
+        <p class="hint" style="margin-top: 12px; font-size: 12px;">
+          ⚠️ 请在 Telegram 私聊机器人发送验证码，不要在群里发送。<br>
+          页面将自动检测验证状态并跳转后台。
+        </p>
+        <div class="poll-status">
+          <span class="spinner"></span> 等待验证中...
+        </div>
+        <div v-if="otpCountdown > 0" style="font-size: 12px; color: #888; margin-top: 8px;">
+          剩余有效时间：{{ otpCountdown }}s
+        </div>
+        <button class="btn btn-secondary" style="margin-top: 12px;" @click="resetOtp">重新获取</button>
+        <div v-if="authError" class="alert alert-error" style="margin-top: 12px;">{{ authError }}</div>
+      </div>
+
+      <!-- Step 3: expired / failed -->
+      <div v-else-if="otpStep === 'expired'">
+        <div class="alert alert-error">验证码已过期，请重新获取。</div>
+        <button class="btn btn-primary" style="margin-top: 12px;" @click="resetOtp">重新获取</button>
+      </div>
     </div>
 
     <div v-else-if="!authStore.isAdmin" class="card">
@@ -231,13 +260,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, onUnmounted, reactive } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
 
 const authStore = useAuthStore()
 const loading = ref(true)
-const authLoading = ref(false)
 const authError = ref('')
 const activeTab = ref('config')
 const saving = ref(false)
@@ -246,6 +274,87 @@ const reportsLoading = ref(false)
 const reports = ref([])
 const statusFilter = ref('')
 const reviewNotes = reactive({})
+
+// OTP login state
+const otpStep = ref('request')   // 'request' | 'pending' | 'expired'
+const otpCode = ref('')
+const otpId = ref('')
+const otpLoading = ref(false)
+const otpCountdown = ref(0)
+let pollTimer = null
+let countdownTimer = null
+
+async function requestOtp() {
+  otpLoading.value = true
+  authError.value = ''
+  try {
+    const { data } = await api.post('/auth/otp/request')
+    if (!data.success) throw new Error(data.message)
+    otpId.value = data.otpId
+    otpCode.value = data.code
+    otpStep.value = 'pending'
+    otpCountdown.value = data.expiresIn || 300
+    startPolling()
+    startCountdown()
+  } catch (e) {
+    authError.value = e.response?.data?.message || e.message || '获取验证码失败'
+  } finally {
+    otpLoading.value = false
+  }
+}
+
+function startPolling() {
+  stopPolling()
+  pollTimer = setInterval(async () => {
+    try {
+      const { data } = await api.get('/auth/otp/status', { params: { otpId: otpId.value } })
+      if (data.status === 'verified' && data.token) {
+        stopPolling()
+        stopCountdown()
+        authStore.setToken(data.token)
+        await loadConfig()
+        await loadReports()
+      } else if (data.status === 'expired' || data.status === 'used') {
+        stopPolling()
+        stopCountdown()
+        otpStep.value = 'expired'
+      }
+    } catch (e) {
+      // ignore poll errors (network hiccup, server restart), keep trying
+      if (import.meta.env.DEV) console.debug('[OTP poll error]', e?.message)
+    }
+  }, 2000)
+}
+
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+}
+
+function startCountdown() {
+  stopCountdown()
+  countdownTimer = setInterval(() => {
+    otpCountdown.value -= 1
+    if (otpCountdown.value <= 0) {
+      stopCountdown()
+      stopPolling()
+      otpStep.value = 'expired'
+    }
+  }, 1000)
+}
+
+function stopCountdown() {
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
+}
+
+function resetOtp() {
+  stopPolling()
+  stopCountdown()
+  otpStep.value = 'request'
+  otpCode.value = ''
+  otpId.value = ''
+  otpCountdown.value = 0
+  authError.value = ''
+}
 
 const tabs = [
   { key: 'config', label: '⚙️ 配置' },
@@ -258,6 +367,7 @@ const statuses = [
   { value: 'pending', label: '待审核' },
   { value: 'approved', label: '已通过' },
   { value: 'rejected', label: '已拒绝' },
+  { value: 'need_more_info', label: '待补充' },
 ]
 
 const config = reactive({
@@ -280,19 +390,6 @@ const config = reactive({
   },
 })
 
-async function login() {
-  authLoading.value = true
-  authError.value = ''
-  try {
-    await authStore.loginWithTelegram()
-    await loadConfig()
-  } catch (e) {
-    authError.value = e.message || '登录失败'
-  } finally {
-    authLoading.value = false
-  }
-}
-
 async function loadConfig() {
   const { data } = await api.get('/admin/config')
   if (data.success) {
@@ -312,7 +409,6 @@ async function loadReports() {
 }
 
 async function saveConfig() {
-  // Validate template fields before saving
   if (activeTab.value === 'template') {
     const emptyName = config.reportTemplate.fields.find((f) => !f.name.trim())
     if (emptyName) {
@@ -358,29 +454,16 @@ async function reviewReport(id, status) {
 function addStartButton() {
   config.startContent.buttons.push({ text: '', url: '', action: '' })
 }
-
-function removeStartButton(i) {
-  config.startContent.buttons.splice(i, 1)
-}
-
-function addKeyboard() {
-  config.keyboards.push({ text: '', action: 'write_report' })
-}
-
-function removeKeyboard(i) {
-  config.keyboards.splice(i, 1)
-}
-
+function removeStartButton(i) { config.startContent.buttons.splice(i, 1) }
+function addKeyboard() { config.keyboards.push({ text: '', action: 'write_report' }) }
+function removeKeyboard(i) { config.keyboards.splice(i, 1) }
 function addTemplateField() {
   config.reportTemplate.fields.push({ name: '', label: '', type: 'text', required: false, options: [] })
 }
-
-function removeTemplateField(i) {
-  config.reportTemplate.fields.splice(i, 1)
-}
+function removeTemplateField(i) { config.reportTemplate.fields.splice(i, 1) }
 
 function statusLabel(s) {
-  return { pending: '待审核', approved: '已通过', rejected: '已拒绝' }[s] || s
+  return { pending: '待审核', approved: '已通过', rejected: '已拒绝', need_more_info: '待补充' }[s] || s
 }
 
 function formatDate(d) {
@@ -396,6 +479,11 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  stopPolling()
+  stopCountdown()
 })
 </script>
 
@@ -421,4 +509,24 @@ onMounted(async () => {
 .review-actions { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; }
 .tag { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-right: 4px; }
 .template-field-row { margin-bottom: 16px; padding: 12px; background: var(--tg-theme-bg-color); border-radius: 8px; border: 1px solid rgba(0,0,0,0.08); }
+.otp-card { max-width: 400px; margin: 40px auto; text-align: center; }
+.otp-card h2 { margin-bottom: 16px; }
+.hint { color: #666; font-size: 13px; margin: 12px 0; line-height: 1.5; }
+.otp-code {
+  font-size: 36px; font-weight: bold; letter-spacing: 10px;
+  background: #f5f5f5; border-radius: 12px; padding: 16px 24px;
+  margin: 16px auto; color: #1a73e8; font-family: monospace;
+  display: inline-block;
+}
+.poll-status { display: flex; align-items: center; justify-content: center; gap: 8px; color: #888; font-size: 13px; margin-top: 12px; }
+.spinner {
+  width: 16px; height: 16px; border: 2px solid #ddd;
+  border-top-color: #1a73e8; border-radius: 50%;
+  animation: spin 0.8s linear infinite; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn-secondary {
+  background: #f0f0f0; color: #333; border: none; border-radius: 8px;
+  padding: 10px 16px; cursor: pointer; font-size: 14px;
+}
 </style>

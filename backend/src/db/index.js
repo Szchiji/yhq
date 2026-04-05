@@ -19,6 +19,7 @@ async function connectDB() {
     require('../models/Report');
     require('../models/Admin');
     require('../models/ReportDraft');
+    require('../models/AdminLoginOtp');
 
     // Enable pg_trgm for trigram-based full-text search (best-effort)
     try {
