@@ -97,6 +97,8 @@ async function getReports(req, res) {
 
 /**
  * Review a report (approve / reject / need_more_info)
+ * Uses atomic conditional update to prevent duplicate/concurrent reviews.
+ * State machine: approve/reject only allowed from 'pending'.
  */
 async function reviewReport(req, res) {
   try {
@@ -117,11 +119,6 @@ async function reviewReport(req, res) {
     const safeReviewNote = typeof reviewNote === 'string' ? reviewNote.slice(0, 500) : '';
     const safeNeedMoreInfoNote = typeof needMoreInfoNote === 'string' ? needMoreInfoNote.slice(0, 1000) : '';
 
-    const report = await Report.findByPk(id);
-    if (!report) {
-      return res.status(404).json({ success: false, message: '报告不存在' });
-    }
-
     const updateFields = {
       status,
       reviewNote: safeReviewNote,
@@ -132,8 +129,28 @@ async function reviewReport(req, res) {
       updateFields.needMoreInfoNote = safeNeedMoreInfoNote;
     }
 
-    await report.update(updateFields);
+    // Atomic conditional update: only proceed if status is currently 'pending'
+    const [affectedRows] = await Report.update(updateFields, {
+      where: { id, status: 'pending' },
+    });
 
+    if (affectedRows === 0) {
+      const report = await Report.findByPk(id);
+      if (!report) return res.status(404).json({ success: false, message: '报告不存在' });
+
+      if (report.status === 'need_more_info') {
+        return res.status(409).json({
+          success: false,
+          message: '该报告正在等待用户补充材料，不可直接通过/拒绝，请等待用户重新提交后再审核。',
+        });
+      }
+      return res.status(409).json({
+        success: false,
+        message: `该报告已由其他管理员处理（当前状态：${report.status}），无需重复操作。`,
+      });
+    }
+
+    const report = await Report.findByPk(id);
     const bot = req.app.get('bot');
     const adminConfig = await Admin.findOne({ where: { adminId: config.ADMIN_ID } });
 
@@ -192,7 +209,13 @@ async function reviewReport(req, res) {
         || '🔎 管理员需要更多信息才能完成审核，请补充材料后重新提交。';
       const noteText = safeNeedMoreInfoNote ? `\n\n📋 补充要求：${safeNeedMoreInfoNote}` : '';
       if (bot && report.userId) {
-        await bot.telegram.sendMessage(String(report.userId), baseMsg + noteText).catch(() => {});
+        await bot.telegram.sendMessage(String(report.userId), baseMsg + noteText, {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🔄 补充完成，重新提交', callback_data: `resubmit_${report.id}` },
+            ]],
+          },
+        }).catch(() => {});
       }
     }
 

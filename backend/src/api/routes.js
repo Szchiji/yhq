@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAdmin, requireAuth } = require('../utils/auth');
 const { telegramAuth } = require('./controllers/authController');
+const { requestOtp, otpStatus } = require('./controllers/otpController');
 const { getConfig, updateConfig } = require('./controllers/adminController');
 const {
   submitReport,
@@ -12,6 +13,10 @@ const {
 
 // Auth
 router.post('/auth/telegram', telegramAuth);
+
+// OTP auth (browser-based admin login)
+router.post('/auth/otp/request', requestOtp);
+router.get('/auth/otp/status', otpStatus);
 
 // Admin routes (requires admin JWT)
 router.get('/admin/config', requireAdmin, getConfig);
