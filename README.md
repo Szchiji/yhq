@@ -79,12 +79,37 @@ telegram-report-bot/
 |--------|------|------|------|
 | `BOT_TOKEN` | ✅ | Telegram Bot Token | `1234567890:AAHxxxxxxx` |
 | `ADMIN_ID` | ✅ | 管理员 Telegram ID | `123456789` |
-| `MONGODB_URI` | ✅ | MongoDB 连接字符串 | `mongodb+srv://user:pass@cluster.mongodb.net/bot` |
+| `DATABASE_URL` | ✅ | PostgreSQL 连接字符串（Railway 自动注入）| `postgresql://...` |
 | `JWT_SECRET` | ✅ | JWT 签名密钥（随机字符串）| `your-super-secret-key` |
-| `WEBHOOK_DOMAIN` | ✅ | Railway 部署域名 | `https://yourapp.up.railway.app` |
+| `WEBHOOK_URL` | ✅ | Railway 部署域名（用于 Webhook 模式）| `https://yourapp.up.railway.app` |
 | `API_URL` | ✅ | API 服务器地址 | `https://yourapp.up.railway.app` |
 | `FRONTEND_URL` | ✅ | 前端地址（同 API_URL）| `https://yourapp.up.railway.app` |
-| `PORT` | ❌ | 服务端口（Railway 自动设置）| `3000` |
+| `BOT_MODE` | ❌ | Bot 启动模式：`auto`/`webhook`/`polling`（默认 `auto`）| `auto` |
+| `WEBHOOK_PATH` | ❌ | Webhook 路径（默认 `/webhook`）| `/webhook` |
+| `PORT` | ❌ | 服务端口（Railway 自动设置）| `8080` |
+
+> **说明**：`BOT_MODE=auto` 时，若同时设置了 `WEBHOOK_URL` 且 `NODE_ENV=production`，则自动使用 Webhook 模式；否则使用 Polling 模式。
+
+#### Bot 模式说明
+
+| 模式 | 触发条件 | 用途 |
+|------|----------|------|
+| `auto` | 默认 | 生产环境自动 Webhook，本地自动 Polling |
+| `webhook` | `BOT_MODE=webhook` | 强制使用 Webhook |
+| `polling` | `BOT_MODE=polling` | 强制使用 Polling（本地开发推荐）|
+
+#### 如何验证 Webhook 已设置
+
+部署成功后，可通过以下 Telegram API 查看 webhook 状态：
+
+```
+https://api.telegram.org/bot<BOT_TOKEN>/getWebhookInfo
+```
+
+日志中应看到：
+```
+[BOT] Webhook mode | path: /webhook | url: https://yourapp.up.railway.app/webhook
+```
 
 ### 4. 配置 Mini App
 
