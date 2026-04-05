@@ -40,7 +40,7 @@ const Report = sequelize.define('Report', {
     defaultValue: [],
   },
   status: {
-    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    type: DataTypes.ENUM('pending', 'approved', 'rejected', 'need_more_info'),
     defaultValue: 'pending',
   },
   reviewedAt: {
@@ -55,9 +55,20 @@ const Report = sequelize.define('Report', {
     type: DataTypes.STRING,
     defaultValue: '',
   },
+  // Note required when status = need_more_info
+  needMoreInfoNote: {
+    type: DataTypes.TEXT,
+    defaultValue: '',
+  },
+  // Legacy single channel message id (kept for backward compat)
   channelMessageId: {
     type: DataTypes.BIGINT,
     allowNull: true,
+  },
+  // Multi-channel push records: [{chatId, messageId, url}]
+  channelMessages: {
+    type: DataTypes.JSONB,
+    defaultValue: [],
   },
 }, {
   timestamps: true,
