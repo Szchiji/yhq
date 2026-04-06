@@ -247,7 +247,7 @@
           <p style="color: var(--tg-theme-hint-color); text-align: center;">暂无报告</p>
         </div>
 
-        <div v-for="report in reports" :key="report.id" class="card report-card">
+        <div v-for="report in reports" :key="report.id" :class="['card report-card', `report-card--${report.status}`]">
           <div class="report-header">
             <span class="badge" :class="`badge-${report.status}`">
               {{ statusLabel(report.status) }}
@@ -550,10 +550,10 @@ onUnmounted(() => {
 .filter-btn.active { background: var(--tg-theme-button-color, #1a73e8); color: white; border-color: transparent; }
 .filter-btn:hover:not(.active) { background: #f0f0f0; }
 .report-card { padding: 14px; margin-bottom: 12px; border-left: 3px solid #ddd; transition: border-color 0.15s; }
-.report-card:has(.badge-pending) { border-left-color: #ff9800; }
-.report-card:has(.badge-approved) { border-left-color: #4caf50; }
-.report-card:has(.badge-rejected) { border-left-color: #f44336; }
-.report-card:has(.badge-need_more_info) { border-left-color: #ff9800; }
+.report-card--pending { border-left-color: #ff9800; }
+.report-card--approved { border-left-color: #4caf50; }
+.report-card--rejected { border-left-color: #f44336; }
+.report-card--need_more_info { border-left-color: #ff9800; }
 .report-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .review-actions { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; }
 .tag { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-right: 4px; margin-bottom: 4px; }

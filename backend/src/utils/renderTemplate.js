@@ -24,7 +24,7 @@ function renderPublishTemplate(template, vars) {
  *
  * @param {object} report        - Report model instance
  * @param {string} reportUrl     - Full URL to the report detail page
- * @param {function} isValidUrl  - Predicate to check if url is a public URL
+ * @param {function} [isValidUrl] - Optional predicate to check if url is a public URL
  * @returns {object}
  */
 function buildPublishVars(report, reportUrl, isValidUrl) {
