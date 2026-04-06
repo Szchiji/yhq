@@ -75,6 +75,11 @@ body {
   color: white;
 }
 
+.btn-warning {
+  background: #fb8c00;
+  color: white;
+}
+
 .form-group {
   margin-bottom: 14px;
 }
@@ -130,6 +135,7 @@ h1, h2, h3 {
 .badge-pending { background: #fff3e0; color: #e65100; }
 .badge-approved { background: #e8f5e9; color: #2e7d32; }
 .badge-rejected { background: #ffebee; color: #c62828; }
+.badge-need_more_info { background: #fff8e1; color: #f57f17; }
 
 .alert {
   padding: 12px 16px;

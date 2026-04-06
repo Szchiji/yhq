@@ -18,6 +18,7 @@ const {
   startReportWizard,
   notifyAdmins,
 } = require('./handlers/reportWizard');
+const { renderPublishTemplate, buildPublishVars, DEFAULT_PUBLISH_TEMPLATE } = require('../utils/renderTemplate');
 const { getAdminConfig, buildMainKeyboard, buildChannelMessageUrl } = require('./keyboards');
 const ReportDraft = require('../models/ReportDraft');
 const Report = require('../models/Report');
@@ -202,10 +203,9 @@ function createBot() {
     const frontendUrl = config.FRONTEND_URL || config.API_URL;
     const reportUrl = config.joinUrl(frontendUrl, 'report/' + report.id);
 
-    const pushText =
-      '📋 *报告推送* No.' + report.reportNumber + '\n\n' +
-      buildPreview(report.content || {}, fields) +
-      (config.isValidPublicUrl(reportUrl) ? '\n🔗 [查看报告详情](' + reportUrl + ')' : '');
+    const template = (adminConfig && adminConfig.publishTemplate) || DEFAULT_PUBLISH_TEMPLATE;
+    const vars = buildPublishVars(report, reportUrl, config.isValidPublicUrl);
+    const pushText = renderPublishTemplate(template, vars);
 
     const channelMessages = [];
     for (const chatId of publishChats) {

@@ -5,6 +5,7 @@ const Admin = require('../../models/Admin');
 const config = require('../../config');
 const { escapeLike } = require('../../utils/sanitize');
 const { buildChannelMessageUrl } = require('../../bot/keyboards');
+const { renderPublishTemplate, buildPublishVars, DEFAULT_PUBLISH_TEMPLATE } = require('../../utils/renderTemplate');
 
 /**
  * Get publish channel list: PUBLISH_CHATS env var > admin DB config.
@@ -160,13 +161,9 @@ async function reviewReport(req, res) {
       const frontendUrl = config.FRONTEND_URL || config.API_URL;
       const reportUrl = config.joinUrl(frontendUrl, `report/${report.id}`);
 
-      const pushText =
-        `📋 *报告推送* No.${report.reportNumber}\n\n` +
-        `👤 @${report.username || '匿名'}\n` +
-        `📌 ${report.title || '无标题'}\n\n` +
-        `${report.description || ''}\n\n` +
-        (report.tags.length > 0 ? `🏷 ${report.tags.map((t) => `#${t}`).join(' ')}\n\n` : '') +
-        (config.isValidPublicUrl(reportUrl) ? `🔗 [查看报告详情](${reportUrl})` : '');
+      const template = (adminConfig && adminConfig.publishTemplate) || DEFAULT_PUBLISH_TEMPLATE;
+      const vars = buildPublishVars(report, reportUrl, config.isValidPublicUrl);
+      const pushText = renderPublishTemplate(template, vars);
 
       const channelMessages = [];
       if (bot) {

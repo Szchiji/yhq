@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
+const { DEFAULT_PUBLISH_TEMPLATE } = require('../utils/renderTemplate');
 
 const DEFAULT_KEYBOARDS = [
   { text: '📝 写报告', action: 'write_report' },
@@ -47,6 +48,10 @@ const Admin = sequelize.define('Admin', {
       pending: '⏳ 你的报告已提交，等待管理员审核。',
       needMoreInfo: '🔎 管理员需要更多信息才能完成审核，请补充材料后重新提交。',
     },
+  },
+  publishTemplate: {
+    type: DataTypes.TEXT,
+    defaultValue: DEFAULT_PUBLISH_TEMPLATE,
   },
 }, {
   timestamps: true,

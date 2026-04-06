@@ -60,11 +60,14 @@ async function updateConfig(req, res) {
         fields: body.reportTemplate.fields.slice(0, 20).map((f) => ({
           name: String(f.name || '').slice(0, 64),
           label: String(f.label || '').slice(0, 128),
-          type: ['text', 'textarea', 'select', 'media', 'location', 'multiselect'].includes(f.type) ? f.type : 'text',
+          type: ['text', 'textarea', 'select', 'media', 'tags', 'location', 'multiselect'].includes(f.type) ? f.type : 'text',
           required: Boolean(f.required),
           options: Array.isArray(f.options) ? f.options.slice(0, 20).map((o) => String(o).slice(0, 128)) : [],
         })),
       };
+    }
+    if (typeof body.publishTemplate === 'string') {
+      safeUpdates.publishTemplate = body.publishTemplate.slice(0, 4096);
     }
 
     const [admin] = await Admin.upsert({ adminId: config.ADMIN_ID, ...safeUpdates });
