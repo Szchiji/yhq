@@ -48,6 +48,15 @@ const Admin = sequelize.define('Admin', {
       needMoreInfo: '🔎 管理员需要更多信息才能完成审核，请补充材料后重新提交。',
     },
   },
+  publishTemplate: {
+    type: DataTypes.TEXT,
+    defaultValue:
+      '📋 *报告推送* No.{{reportNumber}}\n\n' +
+      '👤 @{{username}}\n' +
+      '📌 {{title}}\n\n' +
+      '{{description}}\n\n' +
+      '{{tags}}{{url}}',
+  },
 }, {
   timestamps: true,
   tableName: 'admins',

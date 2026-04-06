@@ -88,6 +88,8 @@
                   <option value="text">单行文本</option>
                   <option value="textarea">多行文本</option>
                   <option value="select">下拉选择</option>
+                  <option value="media">图片/文件证据</option>
+                  <option value="tags">标签</option>
                 </select>
               </div>
               <div class="form-group" style="flex: 0 0 auto; margin-bottom: 0; display: flex; align-items: flex-end;">
@@ -195,6 +197,29 @@
             <label>待审核时发送</label>
             <textarea v-model="config.reviewFeedback.pending" class="form-control" rows="2"></textarea>
           </div>
+          <div class="form-group">
+            <label>需补充材料时发送</label>
+            <textarea v-model="config.reviewFeedback.needMoreInfo" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+
+        </div>
+
+        <div class="card">
+          <div class="section-title">📤 推送模板</div>
+          <p style="font-size: 12px; color: var(--tg-theme-hint-color); margin-bottom: 10px;">
+            审核通过后推送到频道时使用的文字模板，支持以下变量：<br>
+            <code>{{reportNumber}}</code> 报告编号 &nbsp;
+            <code>{{title}}</code> 标题 &nbsp;
+            <code>{{description}}</code> 描述 &nbsp;
+            <code>{{username}}</code> 提交人 &nbsp;
+            <code>{{tags}}</code> 标签 &nbsp;
+            <code>{{url}}</code> 详情链接
+          </p>
+          <div class="form-group">
+            <label>推送模板（Markdown 格式）</label>
+            <textarea v-model="config.publishTemplate" class="form-control" rows="6" placeholder="📋 *报告推送* No.{{reportNumber}}..."></textarea>
+          </div>
         </div>
 
         <div v-if="saveMsg" class="alert" :class="saveMsg.type === 'success' ? 'alert-success' : 'alert-error'">
@@ -222,7 +247,7 @@
           <p style="color: var(--tg-theme-hint-color); text-align: center;">暂无报告</p>
         </div>
 
-        <div v-for="report in reports" :key="report._id" class="card report-card">
+        <div v-for="report in reports" :key="report.id" class="card report-card">
           <div class="report-header">
             <span class="badge" :class="`badge-${report.status}`">
               {{ statusLabel(report.status) }}
@@ -239,16 +264,30 @@
           </div>
           <div v-if="report.status === 'pending'" class="review-actions">
             <textarea
-              v-model="reviewNotes[report._id]"
+              v-model="reviewNotes[report.id]"
               class="form-control"
               placeholder="审核备注（可选）"
               rows="2"
               style="margin-bottom: 8px;"
             ></textarea>
-            <div style="display: flex; gap: 8px;">
-              <button class="btn btn-success" style="flex: 1;" @click="reviewReport(report._id, 'approved')">✅ 通过</button>
-              <button class="btn btn-danger" style="flex: 1;" @click="reviewReport(report._id, 'rejected')">❌ 拒绝</button>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <button class="btn btn-success" style="flex: 1;" @click="reviewReport(report.id, 'approved')">✅ 通过</button>
+              <button class="btn btn-danger" style="flex: 1;" @click="reviewReport(report.id, 'rejected')">❌ 拒绝</button>
             </div>
+            <div style="margin-bottom: 4px;">
+              <textarea
+                v-model="needMoreInfoNotes[report.id]"
+                class="form-control"
+                placeholder="补充要求说明（发给用户）"
+                rows="2"
+                style="margin-bottom: 6px;"
+              ></textarea>
+              <button class="btn btn-warning" style="width: 100%;" @click="reviewReport(report.id, 'need_more_info')">🔎 要求补充材料</button>
+            </div>
+          </div>
+          <div v-if="report.status === 'need_more_info'" style="margin-top: 8px; padding: 8px; background: #fff8e1; border-radius: 6px; font-size: 12px;">
+            <strong>⏳ 等待用户补充材料</strong>
+            <div v-if="report.needMoreInfoNote" style="margin-top: 4px; color: #555;">要求：{{ report.needMoreInfoNote }}</div>
           </div>
           <div v-if="report.reviewNote" style="margin-top: 8px; font-size: 12px; color: var(--tg-theme-hint-color);">
             审核备注：{{ report.reviewNote }}
@@ -274,6 +313,7 @@ const reportsLoading = ref(false)
 const reports = ref([])
 const statusFilter = ref('')
 const reviewNotes = reactive({})
+const needMoreInfoNotes = reactive({})
 
 // OTP login state
 const otpStep = ref('request')   // 'request' | 'pending' | 'expired'
@@ -387,7 +427,9 @@ const config = reactive({
     approved: '',
     rejected: '',
     pending: '',
+    needMoreInfo: '',
   },
+  publishTemplate: '',
 })
 
 async function loadConfig() {
@@ -441,10 +483,11 @@ async function saveConfig() {
 
 async function reviewReport(id, status) {
   try {
-    await api.put(`/admin/reports/${id}/review`, {
-      status,
-      reviewNote: reviewNotes[id] || '',
-    })
+    const body = { status, reviewNote: reviewNotes[id] || '' }
+    if (status === 'need_more_info') {
+      body.needMoreInfoNote = needMoreInfoNotes[id] || ''
+    }
+    await api.put(`/admin/reports/${id}/review`, body)
     await loadReports()
   } catch (e) {
     alert('操作失败：' + (e.response?.data?.message || e.message))
@@ -489,29 +532,35 @@ onUnmounted(() => {
 
 <style scoped>
 .loading { text-align: center; padding: 40px; color: var(--tg-theme-hint-color); }
-.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .tab-btn {
-  flex: 1; padding: 10px; border: none; border-radius: 8px;
-  background: var(--tg-theme-secondary-bg-color); color: var(--tg-theme-text-color);
-  cursor: pointer; font-size: 13px;
+  flex: 1; min-width: 80px; padding: 10px 8px; border: none; border-radius: 8px;
+  background: var(--tg-theme-secondary-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #222);
+  cursor: pointer; font-size: 13px; transition: background 0.15s;
 }
-.tab-btn.active { background: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color); }
+.tab-btn.active { background: var(--tg-theme-button-color, #1a73e8); color: var(--tg-theme-button-text-color, #fff); }
+.tab-btn:hover:not(.active) { opacity: 0.8; }
 .tab-content { padding-bottom: 40px; }
-.button-row { margin-bottom: 12px; padding: 12px; background: var(--tg-theme-bg-color); border-radius: 8px; }
+.button-row { margin-bottom: 12px; padding: 12px; background: var(--tg-theme-bg-color, #fff); border-radius: 8px; border: 1px solid rgba(0,0,0,0.06); }
 .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
 .filter-btn {
   padding: 6px 12px; border: 1px solid #ddd; border-radius: 16px;
-  background: transparent; cursor: pointer; font-size: 13px;
+  background: transparent; cursor: pointer; font-size: 13px; transition: all 0.15s;
 }
-.filter-btn.active { background: var(--tg-theme-button-color); color: white; border-color: transparent; }
-.report-card { padding: 14px; }
+.filter-btn.active { background: var(--tg-theme-button-color, #1a73e8); color: white; border-color: transparent; }
+.filter-btn:hover:not(.active) { background: #f0f0f0; }
+.report-card { padding: 14px; margin-bottom: 12px; border-left: 3px solid #ddd; transition: border-color 0.15s; }
+.report-card:has(.badge-pending) { border-left-color: #ff9800; }
+.report-card:has(.badge-approved) { border-left-color: #4caf50; }
+.report-card:has(.badge-rejected) { border-left-color: #f44336; }
+.report-card:has(.badge-need_more_info) { border-left-color: #ff9800; }
 .report-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .review-actions { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; }
-.tag { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-right: 4px; }
-.template-field-row { margin-bottom: 16px; padding: 12px; background: var(--tg-theme-bg-color); border-radius: 8px; border: 1px solid rgba(0,0,0,0.08); }
-.otp-card { max-width: 400px; margin: 40px auto; text-align: center; }
+.tag { display: inline-block; background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-right: 4px; margin-bottom: 4px; }
+.template-field-row { margin-bottom: 16px; padding: 12px; background: var(--tg-theme-bg-color, #fff); border-radius: 8px; border: 1px solid rgba(0,0,0,0.08); }
+.otp-card { max-width: 420px; margin: 40px auto; text-align: center; }
 .otp-card h2 { margin-bottom: 16px; }
-.hint { color: #666; font-size: 13px; margin: 12px 0; line-height: 1.5; }
+.hint { color: #666; font-size: 13px; margin: 12px 0; line-height: 1.6; }
 .otp-code {
   font-size: 36px; font-weight: bold; letter-spacing: 10px;
   background: #f5f5f5; border-radius: 12px; padding: 16px 24px;
@@ -528,5 +577,23 @@ onUnmounted(() => {
 .btn-secondary {
   background: #f0f0f0; color: #333; border: none; border-radius: 8px;
   padding: 10px 16px; cursor: pointer; font-size: 14px;
+}
+.btn-success {
+  background: #4caf50; color: #fff; border: none; border-radius: 8px;
+  padding: 10px 16px; cursor: pointer; font-size: 14px; font-weight: 500;
+}
+.btn-warning {
+  background: #ff9800; color: #fff; border: none; border-radius: 8px;
+  padding: 10px 16px; cursor: pointer; font-size: 14px; font-weight: 500;
+}
+.btn-success:hover { opacity: 0.85; }
+.btn-warning:hover { opacity: 0.85; }
+code {
+  background: #f5f5f5; padding: 1px 5px; border-radius: 4px;
+  font-size: 11px; font-family: monospace; color: #c41a16;
+}
+@media (max-width: 480px) {
+  .tab-btn { padding: 8px 4px; font-size: 12px; }
+  .otp-code { font-size: 28px; letter-spacing: 6px; }
 }
 </style>
