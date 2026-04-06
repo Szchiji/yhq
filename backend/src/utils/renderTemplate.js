@@ -33,7 +33,7 @@ function buildPublishVars(report, reportUrl, isValidUrl) {
       ? '🏷 ' + report.tags.map((t) => `#${t}`).join(' ') + '\n\n'
       : '';
   const urlStr =
-    isValidUrl && isValidUrl(reportUrl)
+    typeof isValidUrl === 'function' && isValidUrl(reportUrl)
       ? `🔗 [查看报告详情](${reportUrl})`
       : '';
 

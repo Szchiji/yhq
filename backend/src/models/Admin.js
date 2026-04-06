@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
+const { DEFAULT_PUBLISH_TEMPLATE } = require('../utils/renderTemplate');
 
 const DEFAULT_KEYBOARDS = [
   { text: '📝 写报告', action: 'write_report' },
@@ -50,12 +51,7 @@ const Admin = sequelize.define('Admin', {
   },
   publishTemplate: {
     type: DataTypes.TEXT,
-    defaultValue:
-      '📋 *报告推送* No.{{reportNumber}}\n\n' +
-      '👤 @{{username}}\n' +
-      '📌 {{title}}\n\n' +
-      '{{description}}\n\n' +
-      '{{tags}}{{url}}',
+    defaultValue: DEFAULT_PUBLISH_TEMPLATE,
   },
 }, {
   timestamps: true,

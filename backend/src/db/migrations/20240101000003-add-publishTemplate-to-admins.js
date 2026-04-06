@@ -1,9 +1,4 @@
-const DEFAULT_PUBLISH_TEMPLATE =
-  '📋 *报告推送* No.{{reportNumber}}\n\n' +
-  '👤 @{{username}}\n' +
-  '📌 {{title}}\n\n' +
-  '{{description}}\n\n' +
-  '{{tags}}{{url}}';
+const { DEFAULT_PUBLISH_TEMPLATE } = require('../../utils/renderTemplate');
 
 module.exports = {
   async up(queryInterface, Sequelize) {

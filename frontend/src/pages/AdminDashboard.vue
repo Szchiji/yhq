@@ -213,8 +213,8 @@
             <code>{{title}}</code> 标题 &nbsp;
             <code>{{description}}</code> 描述 &nbsp;
             <code>{{username}}</code> 提交人 &nbsp;
-            <code>{{tags}}</code> 标签 &nbsp;
-            <code>{{url}}</code> 详情链接
+            <code>{{tags}}</code> 格式：🏷 #tag1 #tag2（含换行，无标签时为空）&nbsp;
+            <code>{{url}}</code> 格式：🔗 [查看报告详情](链接)（无有效链接时为空）
           </p>
           <div class="form-group">
             <label>推送模板（Markdown 格式）</label>
